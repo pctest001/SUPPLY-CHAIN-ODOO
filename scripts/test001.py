@@ -40,7 +40,7 @@ def person(name, age, **kw):
 
 person('Jack', 24, gender='M', job='Engineer')
 
-def person(name, age, *, city, job):
+def person2(name, age, *, city, job):
     print(name, age, city, job)
 
 person('Jack', 24, city='Beijing', job='Engineer')

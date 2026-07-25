@@ -1,7 +1,7 @@
 # 学习：类定义、init、实例方法、类方法 done
 # 学习：继承、方法重写  done 
-# 学习：属性访问（@property）
-# 学习：特殊方法（str, repr）
+# 学习：属性访问（@property） done 
+# 学习：特殊方法（str, repr） done 
 # 练习4：定义 OdooModel 基类和 StockQuant 子类
 # 学习：HTTP 协议基础（GET/POST/状态码/Header/Body）
 # 学习：requests 库（get, post, headers, params, json, timeout）
