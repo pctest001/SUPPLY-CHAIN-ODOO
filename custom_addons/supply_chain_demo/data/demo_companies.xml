@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- 多组织初始化：2 工厂（公司）/ 2 仓（每公司主仓） -->
+    <record id="company_plant_a" model="res.company">
+        <field name="name">华南工厂</field>
+        <field name="currency_id" ref="base.CNY"/>
+    </record>
+
+    <record id="company_plant_b" model="res.company">
+        <field name="name">华东工厂</field>
+        <field name="currency_id" ref="base.CNY"/>
+    </record>
+
+    <!-- 华南工厂额外仓 -->
+    <record id="warehouse_plant_a_wh2" model="stock.warehouse">
+        <field name="name">华南工厂-原料仓</field>
+        <field name="code">HNC2</field>
+        <field name="company_id" ref="company_plant_a"/>
+    </record>
+
+    <!-- 华东工厂额外仓 -->
+    <record id="warehouse_plant_b_wh2" model="stock.warehouse">
+        <field name="name">华东工厂-成品仓</field>
+        <field name="code">HDC2</field>
+        <field name="company_id" ref="company_plant_b"/>
+    </record>
+
+    <!-- 每公司第 2 个仓：支撑「多仓库存(F3)」与「跨仓调拨(D2)」演示 -->
+    <record id="warehouse_plant_a_wh3" model="stock.warehouse">
+        <field name="name">华南工厂-成品仓</field>
+        <field name="code">HNF2</field>
+        <field name="company_id" ref="company_plant_a"/>
+    </record>
+
+    <record id="warehouse_plant_b_wh3" model="stock.warehouse">
+        <field name="name">华东工厂-原料仓</field>
+        <field name="code">HDR2</field>
+        <field name="company_id" ref="company_plant_b"/>
+    </record>
+</odoo>

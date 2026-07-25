@@ -1,0 +1,17 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# ===== Odoo 运行日志（落盘文件，非源码）=====
+logs/
+
+# ===== 密钥（含 DeepSeek Key，绝不入库）=====
+.env
+
+# ===== 系统与编辑器噪音 =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

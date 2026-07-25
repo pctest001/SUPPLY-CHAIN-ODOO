@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- A4：默认启用的 AI 配置（DeepSeek）。
+         API Key 仅通过环境变量 SUPPLY_AI_API_KEY 注入，绝不写入本文件/数据库。 -->
+    <record id="ai_config_default" model="ai.config">
+        <field name="name">默认配置（DeepSeek）</field>
+        <field name="provider">deepseek</field>
+        <field name="model">deepseek-chat</field>
+        <field name="api_key_env">SUPPLY_AI_API_KEY</field>
+        <field name="timeout">30</field>
+        <field name="max_tokens">800</field>
+        <field name="active">True</field>
+    </record>
+</odoo>

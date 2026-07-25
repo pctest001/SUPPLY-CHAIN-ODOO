@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 采购申请单号序列：PR/年/00001 -->
+    <record id="seq_sc_purchase_request" model="ir.sequence">
+        <field name="name">采购申请</field>
+        <field name="code">sc.purchase.request</field>
+        <field name="prefix">PR/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="number_increment">1</field>
+    </record>
+</odoo>

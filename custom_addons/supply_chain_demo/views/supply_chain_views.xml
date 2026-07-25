@@ -1,0 +1,678 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- 顶级菜单 -->
+    <menuitem id="menu_supply_chain_root"
+              name="供应链管理"
+              sequence="10"/>
+
+    <!-- 在物料表单中增加流程制造标记 -->
+    <record id="view_product_template_form_sc" model="ir.ui.view">
+        <field name="name">product.template.form.sc</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group>
+                    <field name="is_process_mfg"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============ 采购申请 PR ============ -->
+    <record id="action_sc_purchase_request" model="ir.actions.act_window">
+        <field name="name">采购申请</field>
+        <field name="res_model">sc.purchase.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="help">创建采购申请，提交后一键生成采购订单 PO。</field>
+    </record>
+
+    <menuitem id="menu_sc_purchase_root" name="采购" parent="menu_supply_chain_root" sequence="20"/>
+    <menuitem id="menu_sc_purchase_request" name="采购申请"
+              parent="menu_sc_purchase_root" action="action_sc_purchase_request" sequence="10"/>
+
+    <record id="view_sc_purchase_request_list" model="ir.ui.view">
+        <field name="name">sc.purchase.request.list</field>
+        <field name="model">sc.purchase.request</field>
+        <field name="arch" type="xml">
+            <list string="采购申请" decoration-info="state=='draft'"
+                  decoration-muted="state=='done'" decoration-danger="state=='cancel'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="warehouse_id"/>
+                <field name="date_request"/>
+                <field name="requested_by"/>
+                <field name="po_count" optional="show"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sc_purchase_request_form" model="ir.ui.view">
+        <field name="name">sc.purchase.request.form</field>
+        <field name="model">sc.purchase.request</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_submit" string="提交" type="object"
+                            invisible="state != 'draft'" class="btn-primary"/>
+                    <button name="action_generate_po" string="生成采购订单" type="object"
+                            invisible="state != 'confirmed'" class="btn-primary"/>
+                    <button name="action_cancel" string="取消" type="object"
+                            invisible="state not in ('draft','confirmed')"/>
+                    <button name="action_reset" string="重置草稿" type="object"
+                            invisible="state not in ('done','cancel')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,confirmed,done,cancel"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="requested_by" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="date_request"/>
+                            <field name="company_id"/>
+                            <field name="warehouse_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="申请明细">
+                            <field name="line_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="product_id"/>
+                                    <field name="description"/>
+                                    <field name="product_uom_qty"/>
+                                    <field name="product_uom"/>
+                                    <field name="date_planned"/>
+                                    <field name="price_unit"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="采购订单">
+                            <button name="action_view_pos" type="object"
+                                    string="查看关联 PO"
+                                    invisible="po_count == 0"/>
+                            <field name="po_ids" readonly="1" nolabel="1"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============ C2 采购订单 PO 审批流 ============ -->
+    <record id="view_purchase_order_form_sc_approval" model="ir.ui.view">
+        <field name="name">purchase.order.form.sc.approval</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_submit_for_approval" string="提交审批" type="object"
+                        invisible="approval_state not in ('draft','rejected')" class="btn-primary"/>
+                <button name="action_approve" string="审批通过" type="object"
+                        invisible="approval_state != 'pending'" class="btn-primary"/>
+                <button name="action_reject" string="驳回" type="object"
+                        invisible="approval_state != 'pending'"/>
+                <button name="action_reset_approval" string="重置草稿" type="object"
+                        invisible="approval_state != 'rejected'"/>
+                <field name="approval_state" widget="statusbar"
+                       statusbar_visible="draft,pending,approved,rejected"/>
+            </xpath>
+            <xpath expr="//sheet" position="inside">
+                <group string="审批信息">
+                    <field name="approved_by" readonly="1"/>
+                    <field name="approved_date" readonly="1"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_purchase_order_tree_sc_approval" model="ir.ui.view">
+        <field name="name">purchase.order.tree.sc.approval</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="inside">
+                <field name="approval_state" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============ PO 表单/列表 全中文化（覆盖原生英文标签） ============ -->
+    <record id="view_purchase_order_form_sc_zh" model="ir.ui.view">
+        <field name="name">purchase.order.form.sc.zh</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <!-- 头部按钮 -->
+            <xpath expr='//button[@name="action_rfq_send" and @invisible="state != &apos;draft&apos;"]' position="attributes">
+                <attribute name="string">发送邮件</attribute>
+            </xpath>
+            <xpath expr='//button[@name="print_quotation"]' position="attributes">
+                <attribute name="string">打印询价单</attribute>
+            </xpath>
+            <xpath expr='//button[@name="button_confirm"]' position="attributes">
+                <attribute name="string">确认订单</attribute>
+            </xpath>
+            <xpath expr='//button[@name="button_approve"]' position="attributes">
+                <attribute name="string">审批订单</attribute>
+            </xpath>
+            <xpath expr='//button[@name="action_create_invoice"]' position="attributes">
+                <attribute name="string">创建账单</attribute>
+            </xpath>
+            <xpath expr='//button[@name="action_rfq_send" and @invisible="state != &apos;sent&apos;"]' position="attributes">
+                <attribute name="string">重新发送邮件</attribute>
+            </xpath>
+            <xpath expr='//button[@name="print_quotation"]' position="attributes">
+                <attribute name="string">打印询价单</attribute>
+            </xpath>
+            <xpath expr='//button[@name="button_confirm"]' position="attributes">
+                <attribute name="string">确认订单</attribute>
+            </xpath>
+            <xpath expr='//button[@name="action_rfq_send" and @invisible="state != &apos;purchase&apos;"]' position="attributes">
+                <attribute name="string">发送采购订单邮件</attribute>
+            </xpath>
+            <xpath expr='//button[@name="confirm_reminder_mail"]' position="attributes">
+                <attribute name="string">确认收货日期</attribute>
+            </xpath>
+            <xpath expr='//button[@name="button_draft"]' position="attributes">
+                <attribute name="string">设为草稿</attribute>
+            </xpath>
+            <xpath expr='//button[@name="button_cancel"]' position="attributes">
+                <attribute name="string">取消</attribute>
+            </xpath>
+            <xpath expr='//button[@name="button_done"]' position="attributes">
+                <attribute name="string">锁定</attribute>
+            </xpath>
+            <xpath expr='//button[@name="button_unlock"]' position="attributes">
+                <attribute name="string">解锁</attribute>
+            </xpath>
+            <!-- 统计按钮 -->
+            <xpath expr='//button[@name="action_bill_matching"]//span[@class="o_stat_text"]' position="replace">
+                <span class="o_stat_text">账单匹配</span>
+            </xpath>
+            <xpath expr='//field[@name="invoice_count"]' position="attributes">
+                <attribute name="string">供应商账单</attribute>
+            </xpath>
+            <!-- 标题：询价单 / 采购订单 -->
+            <xpath expr='//span[@class="o_form_label" and @invisible="state not in (&apos;draft&apos;, &apos;sent&apos;)"]' position="replace">
+                <span class="o_form_label" invisible="state not in ('draft', 'sent')">询价单 </span>
+            </xpath>
+            <xpath expr='//span[@class="o_form_label" and @invisible="state in (&apos;draft&apos;, &apos;sent&apos;)"]' position="replace">
+                <span class="o_form_label" invisible="state in ('draft', 'sent')">采购订单 </span>
+            </xpath>
+            <!-- 表单字段 -->
+            <xpath expr='//field[@name="partner_id"]' position="attributes">
+                <attribute name="string">供应商</attribute>
+                <attribute name="placeholder">名称、税号、邮箱或参考</attribute>
+            </xpath>
+            <xpath expr='//field[@name="partner_ref"]' position="attributes">
+                <attribute name="string">供应商参考</attribute>
+            </xpath>
+            <xpath expr='//field[@name="currency_id"]' position="attributes">
+                <attribute name="string">币种</attribute>
+            </xpath>
+            <xpath expr='//field[@name="date_order"]' position="attributes">
+                <attribute name="string">订单日期</attribute>
+            </xpath>
+            <xpath expr='//field[@name="date_planned" and ancestor::div[@name="date_planned_div"]]' position="attributes">
+                <attribute name="string">预计到达日</attribute>
+            </xpath>
+            <xpath expr='//field[@name="date_approve"]' position="attributes">
+                <attribute name="string">审批日期</attribute>
+            </xpath>
+            <xpath expr='//label[@for="date_approve"]' position="replace">
+                <label for="date_approve" invisible="state not in ('purchase', 'done')">审批日期</label>
+            </xpath>
+            <!-- 明细页签 -->
+            <xpath expr='//page[@name="products"]' position="attributes">
+                <attribute name="string">产品</attribute>
+            </xpath>
+            <!-- 行内明细表头 -->
+            <xpath expr='//list//field[@name="product_id"]' position="attributes">
+                <attribute name="string">产品</attribute>
+            </xpath>
+            <xpath expr='//list//field[@name="name"]' position="attributes">
+                <attribute name="string">描述</attribute>
+            </xpath>
+            <xpath expr='//list//field[@name="product_qty"]' position="attributes">
+                <attribute name="string">数量</attribute>
+            </xpath>
+            <xpath expr='//field[@name="price_unit"]' position="attributes">
+                <attribute name="string">单价</attribute>
+            </xpath>
+            <xpath expr='//field[@name="taxes_id"]' position="attributes">
+                <attribute name="string">税额</attribute>
+            </xpath>
+            <xpath expr='//list//field[@name="price_subtotal"]' position="attributes">
+                <attribute name="string">金额</attribute>
+            </xpath>
+            <xpath expr='//list//field[@name="qty_received"]' position="attributes">
+                <attribute name="string">已收货</attribute>
+            </xpath>
+            <xpath expr='//list//field[@name="qty_invoiced"]' position="attributes">
+                <attribute name="string">已开票</attribute>
+            </xpath>
+            <xpath expr='//field[@name="product_uom"]' position="attributes">
+                <attribute name="string">单位</attribute>
+            </xpath>
+            <xpath expr='//field[@name="discount"]' position="attributes">
+                <attribute name="string">折扣%</attribute>
+            </xpath>
+            <xpath expr='//field[@name="date_planned" and ancestor::list]' position="attributes">
+                <attribute name="string">计划日期</attribute>
+            </xpath>
+            <!-- 行内明细表单 -->
+            <xpath expr='//field[@name="qty_received" and ancestor::form]' position="attributes">
+                <attribute name="string">已收货数量</attribute>
+            </xpath>
+            <xpath expr='//field[@name="qty_invoiced" and ancestor::form]' position="attributes">
+                <attribute name="string">已开票数量</attribute>
+            </xpath>
+            <xpath expr='//page[@name="notes"]' position="attributes">
+                <attribute name="string">备注</attribute>
+            </xpath>
+            <xpath expr='//page[@name="invoices_incoming_shiptments"]' position="attributes">
+                <attribute name="string">发票与入库</attribute>
+            </xpath>
+            <!-- 添加控件 -->
+            <xpath expr='//create[@name="add_product_control"]' position="attributes">
+                <attribute name="string">添加产品</attribute>
+            </xpath>
+            <xpath expr='//create[@name="add_section_control"]' position="attributes">
+                <attribute name="string">添加区块</attribute>
+            </xpath>
+            <xpath expr='//create[@name="add_note_control"]' position="attributes">
+                <attribute name="string">添加备注</attribute>
+            </xpath>
+            <xpath expr='//button[@name="action_add_from_catalog"]' position="attributes">
+                <attribute name="string">目录</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 主采购订单列表 中文化 -->
+    <record id="view_purchase_order_tree_sc_zh" model="ir.ui.view">
+        <field name="name">purchase.order.tree.sc.zh</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="string">采购订单</attribute>
+            </xpath>
+            <xpath expr="//field[@name='name']" position="attributes">
+                <attribute name="string">参考单号</attribute>
+            </xpath>
+            <xpath expr="//field[@name='date_order']" position="attributes">
+                <attribute name="string">订单日期</attribute>
+            </xpath>
+            <xpath expr="//field[@name='date_approve']" position="attributes">
+                <attribute name="string">审批日期</attribute>
+            </xpath>
+            <xpath expr="//field[@name='partner_id']" position="attributes">
+                <attribute name="string">供应商</attribute>
+            </xpath>
+            <xpath expr="//field[@name='user_id']" position="attributes">
+                <attribute name="string">采购员</attribute>
+            </xpath>
+            <xpath expr="//field[@name='origin']" position="attributes">
+                <attribute name="string">来源</attribute>
+            </xpath>
+            <xpath expr="//field[@name='amount_untaxed']" position="attributes">
+                <attribute name="string">未税金额</attribute>
+                <attribute name="sum">未税金额合计</attribute>
+            </xpath>
+            <xpath expr="//field[@name='amount_total']" position="attributes">
+                <attribute name="string">总金额</attribute>
+            </xpath>
+            <xpath expr="//field[@name='date_planned']" position="attributes">
+                <attribute name="string">预计到达日</attribute>
+            </xpath>
+            <xpath expr="//field[@name='state']" position="attributes">
+                <attribute name="string">状态</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 主采购订单搜索 中文化 -->
+    <record id="view_purchase_order_search_sc_zh" model="ir.ui.view">
+        <field name="name">purchase.order.search.sc.zh</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_view_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="attributes">
+                <attribute name="string">搜索采购订单</attribute>
+            </xpath>
+            <xpath expr="//field[@name='name']" position="attributes">
+                <attribute name="string">订单</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='my_Orders']" position="attributes">
+                <attribute name="string">我的订单</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='starred']" position="attributes">
+                <attribute name="string">星标</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='not_invoiced']" position="attributes">
+                <attribute name="string">待开票</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='invoiced']" position="attributes">
+                <attribute name="string">已收账单</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='order_date']" position="attributes">
+                <attribute name="string">订单日期</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='activities_exception']" position="attributes">
+                <attribute name="string">警告</attribute>
+            </xpath>
+            <xpath expr="//group" position="attributes">
+                <attribute name="string">分组</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='vendor']" position="attributes">
+                <attribute name="string">供应商</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='representative']" position="attributes">
+                <attribute name="string">采购员</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 独立采购订单明细行列表 中文化 -->
+    <record id="view_purchase_order_line_tree_sc_zh" model="ir.ui.view">
+        <field name="name">purchase.order.line.tree.sc.zh</field>
+        <field name="model">purchase.order.line</field>
+        <field name="inherit_id" ref="purchase.purchase_order_line_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="string">采购订单明细</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_id']" position="attributes">
+                <attribute name="string">采购订单</attribute>
+            </xpath>
+            <xpath expr="//field[@name='name']" position="attributes">
+                <attribute name="string">描述</attribute>
+            </xpath>
+            <xpath expr="//field[@name='partner_id']" position="attributes">
+                <attribute name="string">供应商</attribute>
+            </xpath>
+            <xpath expr="//field[@name='product_id']" position="attributes">
+                <attribute name="string">产品</attribute>
+            </xpath>
+            <xpath expr="//field[@name='price_unit']" position="attributes">
+                <attribute name="string">单价</attribute>
+            </xpath>
+            <xpath expr="//field[@name='product_qty']" position="attributes">
+                <attribute name="string">数量</attribute>
+            </xpath>
+            <xpath expr="//field[@name='product_uom']" position="attributes">
+                <attribute name="string">单位</attribute>
+            </xpath>
+            <xpath expr="//field[@name='price_subtotal']" position="attributes">
+                <attribute name="string">金额</attribute>
+            </xpath>
+            <xpath expr="//field[@name='date_planned']" position="attributes">
+                <attribute name="string">计划日期</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 独立采购订单明细行搜索 中文化 -->
+    <record id="view_purchase_order_line_search_sc_zh" model="ir.ui.view">
+        <field name="name">purchase.order.line.search.sc.zh</field>
+        <field name="model">purchase.order.line</field>
+        <field name="inherit_id" ref="purchase.purchase_order_line_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="attributes">
+                <attribute name="string">搜索采购订单明细</attribute>
+            </xpath>
+            <xpath expr="//field[@name='partner_id']" position="attributes">
+                <attribute name="string">供应商</attribute>
+            </xpath>
+            <xpath expr="//filter[@name='groupby_supplier']" position="attributes">
+                <attribute name="string">供应商</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 采购看板（仪表盘列表变体）按钮 中文化 -->
+    <record id="view_purchase_order_kpis_tree_sc_zh" model="ir.ui.view">
+        <field name="name">purchase.order.kpis.tree.sc.zh</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_kpis_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='action_create_invoice']" position="attributes">
+                <attribute name="string">创建账单</attribute>
+            </xpath>
+            <xpath expr="//header/button[@name='button_cancel']" position="attributes">
+                <attribute name="string">取消</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============ C3 收货：批次/效期 中文化 ============ -->
+    <!-- 收货明细（Detailed Operations）表格：批次号 + 效期 中文化 -->
+    <record id="view_stock_move_line_detailed_op_sc_zh" model="ir.ui.view">
+        <field name="name">stock.move.line.detailed.op.sc.zh</field>
+        <field name="model">stock.move.line</field>
+        <field name="inherit_id" ref="product_expiry.view_stock_move_line_detailed_operation_tree_expiry"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='lot_name']" position="attributes">
+                <attribute name="string">批次号</attribute>
+            </xpath>
+            <xpath expr="//field[@name='expiration_date']" position="attributes">
+                <attribute name="string">效期</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 批次(Lot) 表单：批次号 + 效期 中文化 -->
+    <record id="view_production_lot_form_sc_zh" model="ir.ui.view">
+        <field name="name">stock.production.lot.form.sc.zh</field>
+        <field name="model">stock.lot</field>
+        <field name="inherit_id" ref="stock.view_production_lot_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='expiration_date']" position="attributes">
+                <attribute name="string">效期</attribute>
+            </xpath>
+            <xpath expr="//field[@name='removal_date']" position="attributes">
+                <attribute name="string">移除日期</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============ B3 配方主数据 ============ -->
+    <record id="action_sc_recipe" model="ir.actions.act_window">
+        <field name="name">配方</field>
+        <field name="res_model">sc.recipe</field>
+        <field name="view_mode">list,form</field>
+        <field name="help">维护流程制造成品的配方（原料配比）。</field>
+    </record>
+
+    <menuitem id="menu_sc_master_root" name="主数据" parent="menu_supply_chain_root" sequence="15"/>
+    <menuitem id="menu_sc_recipe" name="配方（BOM）" parent="menu_sc_master_root"
+              action="action_sc_recipe" sequence="10"/>
+
+    <record id="view_sc_recipe_list" model="ir.ui.view">
+        <field name="name">sc.recipe.list</field>
+        <field name="model">sc.recipe</field>
+        <field name="arch" type="xml">
+            <list string="配方" decoration-info="line_count == 0">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="finished_product_tmpl_id"/>
+                <field name="company_id"/>
+                <field name="total_qty"/>
+                <field name="line_count" string="原料数" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sc_recipe_form" model="ir.ui.view">
+        <field name="name">sc.recipe.form</field>
+        <field name="model">sc.recipe</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="code" readonly="1"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="finished_product_tmpl_id"/>
+                            <field name="company_id"/>
+                        </group>
+                        <group>
+                            <field name="uom_id"/>
+                            <field name="total_qty" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="原料明细">
+                            <field name="line_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="product_id"/>
+                                    <field name="product_qty"/>
+                                    <field name="uom_id"/>
+                                    <field name="percentage" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="工艺备注">
+                            <field name="note" nolabel="1" placeholder="如投料顺序、温度、混合时间等"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- 成品物料表单：展示其配方 -->
+    <record id="view_product_template_form_sc_recipe" model="ir.ui.view">
+        <field name="name">product.template.form.sc.recipe</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="配方" invisible="not is_process_mfg">
+                    <field name="recipe_ids" nolabel="1" readonly="1">
+                        <list>
+                            <field name="code"/>
+                            <field name="name"/>
+                            <field name="company_id"/>
+                            <field name="total_qty"/>
+                            <button name="action_open_form" type="object" string="查看"
+                                    class="btn-secondary" icon="fa-external-link"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============ E1 供应商协同（交期确认） ============ -->
+    <record id="action_sc_supplier_ack" model="ir.actions.act_window">
+        <field name="name">交期确认</field>
+        <field name="res_model">sc.supplier.ack</field>
+        <field name="view_mode">list,form</field>
+        <field name="help">供应商交期确认工作台：跟踪各 PO 的供应商交期确认情况。</field>
+    </record>
+
+    <menuitem id="menu_sc_supplier_root" name="供应商协同" parent="menu_supply_chain_root" sequence="25"/>
+    <menuitem id="menu_sc_supplier_ack" name="交期确认" parent="menu_sc_supplier_root"
+              action="action_sc_supplier_ack" sequence="10"/>
+
+    <record id="view_sc_supplier_ack_list" model="ir.ui.view">
+        <field name="name">sc.supplier.ack.list</field>
+        <field name="model">sc.supplier.ack</field>
+        <field name="arch" type="xml">
+            <list string="供应商交期确认" decoration-warning="state=='pending'"
+                  decoration-success="state=='confirmed'" decoration-danger="state=='rejected'">
+                <field name="name"/>
+                <field name="po_id"/>
+                <field name="partner_id"/>
+                <field name="state"/>
+                <field name="committed_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_sc_supplier_ack_form" model="ir.ui.view">
+        <field name="name">sc.supplier.ack.form</field>
+        <field name="model">sc.supplier.ack</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,confirmed,rejected"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="po_id"/>
+                            <field name="partner_id"/>
+                        </group>
+                        <group>
+                            <field name="state"/>
+                            <field name="committed_date"/>
+                            <field name="confirmed_at" readonly="1"/>
+                            <field name="confirmed_by" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="remark" nolabel="1" placeholder="供应商备注 / 交期说明"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- 采购订单：供应商协同入口与状态展示 -->
+    <record id="view_purchase_order_form_sc_supplier_ack" model="ir.ui.view">
+        <field name="name">purchase.order.form.sc.supplier.ack</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_register_supplier_ack" string="登记供应商交期" type="object"
+                        class="btn-secondary" icon="fa-handshake-o"/>
+            </xpath>
+            <xpath expr="//sheet" position="inside">
+                <group string="供应商协同" colspan="2">
+                    <field name="supplier_ack_state"/>
+                    <field name="supplier_committed_date"/>
+                    <button name="action_register_supplier_ack" string="登记/更新交期确认" type="object"
+                            class="btn-secondary" invisible="supplier_ack_state == 'confirmed'"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- 供应商交期确认 向导 -->
+    <record id="view_sc_supplier_ack_wizard_form" model="ir.ui.view">
+        <field name="name">sc.supplier.ack.wizard.form</field>
+        <field name="model">sc.supplier.ack.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="po_id" readonly="1"/>
+                    <field name="partner_id" readonly="1"/>
+                    <field name="committed_date"/>
+                    <field name="remark"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" string="确认交期" type="object" class="btn-primary"/>
+                    <button name="action_reject" string="驳回" type="object" class="btn-secondary"/>
+                    <button string="关闭" special="cancel" class="btn-link"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

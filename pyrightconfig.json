@@ -1,0 +1,21 @@
+{
+  "typeCheckingMode": "standard",
+  "comment": "Odoo 模块在 Docker 容器内运行，本地无 odoo 框架与 requests 源码；以下规则用于消除类型检查器对动态 ORM 框架的误报噪音。",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownParameterType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownLambdaType": "none",
+  "reportUntypedBaseClass": "none",
+  "reportUnannotatedClassAttribute": "none",
+  "reportUntypedFunctionDecorator": "none",
+  "reportMissingParameterType": "none",
+  "reportAny": "none",
+  "reportExplicitAny": "none",
+  "reportImplicitStringConcatenation": "none",
+  "reportUnusedParameter": "none",
+  "reportUndefinedVariable": "none",
+  "reportUnusedImport": "none"
+}

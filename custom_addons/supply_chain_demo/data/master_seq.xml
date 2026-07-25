@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- 配方单号序列：RCP/年/00001 -->
+    <record id="seq_sc_recipe" model="ir.sequence">
+        <field name="name">配方</field>
+        <field name="code">sc.recipe</field>
+        <field name="prefix">RCP/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="number_increment">1</field>
+    </record>
+
+    <!-- 供应商交期确认单序列：SACK/年/00001 -->
+    <record id="seq_sc_supplier_ack" model="ir.sequence">
+        <field name="name">供应商交期确认单</field>
+        <field name="code">sc.supplier.ack</field>
+        <field name="prefix">SACK/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="number_increment">1</field>
+    </record>
+</odoo>

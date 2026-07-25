@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sc_product_template,sc.product.template,model_product_template,base.group_user,1,0,0,0
+access_sc_purchase_request,sc.purchase.request,model_sc_purchase_request,base.group_user,1,1,1,0
+access_sc_purchase_request_line,sc.purchase.request.line,model_sc_purchase_request_line,base.group_user,1,1,1,0
+access_sc_recipe,sc.recipe,model_sc_recipe,base.group_user,1,1,1,0
+access_sc_recipe_line,sc.recipe.line,model_sc_recipe_line,base.group_user,1,1,1,0
+access_sc_supplier_ack,sc.supplier.ack,model_sc_supplier_ack,base.group_user,1,1,1,0
+access_sc_supplier_ack_wizard,sc.supplier.ack.wizard,model_sc_supplier_ack_wizard,base.group_user,1,1,1,0

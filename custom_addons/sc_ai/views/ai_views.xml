@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- AI 智能 菜单（挂在 supply_chain_demo 的「供应链管理」根菜单下） -->
+    <menuitem id="menu_sc_ai_root" name="AI 智能" parent="supply_chain_demo.menu_supply_chain_root" sequence="20"/>
+
+    <!-- 动作 -->
+    <record id="action_ai_config" model="ir.actions.act_window">
+        <field name="name">AI 配置</field>
+        <field name="res_model">ai.config</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_ai_chat_session" model="ir.actions.act_window">
+        <field name="name">AI 对话记录</field>
+        <field name="res_model">ai.chat.session</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <record id="action_ai_chat_wizard" model="ir.actions.act_window">
+        <field name="name">对话助手（提问）</field>
+        <field name="res_model">ai.chat.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- 菜单项 -->
+    <menuitem id="menu_ai_config" name="AI 配置" parent="menu_sc_ai_root" action="action_ai_config" sequence="10"/>
+    <menuitem id="menu_ai_chat" name="AI 对话记录" parent="menu_sc_ai_root" action="action_ai_chat_session" sequence="20"/>
+    <menuitem id="menu_ai_wizard" name="对话助手（提问）" parent="menu_sc_ai_root" action="action_ai_chat_wizard" sequence="30"/>
+
+    <!-- AI 配置表单 -->
+    <record id="view_ai_config_form" model="ir.ui.view">
+        <field name="name">ai.config.form</field>
+        <field name="model">ai.config</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="name"/>
+                    <field name="provider"/>
+                    <field name="base_url"/>
+                    <field name="model"/>
+                    <field name="api_key_env"/>
+                    <field name="timeout"/>
+                    <field name="max_tokens"/>
+                    <field name="active"/>
+                </group>
+                <div class="alert alert-info" colspan="2" role="alert">
+                    API Key 仅从环境变量读取（默认 <b>SUPPLY_AI_API_KEY</b>），不入库、不硬编码、不进前端。
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- AI 对话消息 列表视图（供会话表单内 One2many 引用） -->
+    <record id="view_ai_chat_message_tree" model="ir.ui.view">
+        <field name="name">ai.chat.message.tree</field>
+        <field name="model">ai.chat.message</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="sequence"/>
+                <field name="role"/>
+                <field name="content"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- AI 对话会话表单 -->
+    <record id="view_ai_chat_session_form" model="ir.ui.view">
+        <field name="name">ai.chat.session.form</field>
+        <field name="model">ai.chat.session</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="name"/>
+                    <field name="user_id"/>
+                </group>
+                <field name="last_reply" colspan="2" nolabel="1"/>
+                <field name="message_ids" colspan="2" nolabel="1" readonly="1"/>
+            </form>
+        </field>
+    </record>
+
+    <!-- AI 对话向导表单 -->
+    <record id="view_ai_chat_wizard_form" model="ir.ui.view">
+        <field name="name">ai.chat.wizard.form</field>
+        <field name="model">ai.chat.wizard</field>
+        <field name="arch" type="xml">
+            <form>
+                <group>
+                    <field name="question"/>
+                    <field name="answer"/>
+                </group>
+                <footer>
+                    <button name="action_send" string="发送" type="object" class="btn-primary"/>
+                    <button string="关闭" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

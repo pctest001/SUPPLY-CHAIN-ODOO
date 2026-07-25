@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: odoo
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  odoo:
+    image: odoo:18.0
+    depends_on:
+      - db
+    ports:
+      - "8069:8069"
+    environment:
+      - HOST=db
+      - PORT=5432
+      - USER=odoo
+      - PASSWORD=odoo
+      - DB_NAME=supplychain
+      # A4：AI 对话式助手 DeepSeek Key（值存放在 .env，已 gitignore，绝不入库/前端）
+      - SUPPLY_AI_API_KEY=${SUPPLY_AI_API_KEY}
+    volumes:
+      - ./custom_addons:/mnt/extra-addons
+      - odoo_data:/var/lib/odoo
+      - ./logs/odoo:/var/log/odoo
+    # db-filter 锚定到 supplychain：单库部署直接展示登录页（而非数据库管理器），
+    # 同时避免 Odoo 在登录失败时把请求导向 db 选择器
+    command: -- --dev=all --db-filter=^supplychain$ --logfile=/var/log/odoo/odoo.log
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  odoo_data:

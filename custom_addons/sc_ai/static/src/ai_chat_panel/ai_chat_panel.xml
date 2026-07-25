@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="sc_ai.AiChatSystray">
+        <div class="sc_ai_systray">
+            <button class="sc_ai_toggle o_dropdown_toggler" t-on-click="toggle"
+                    title="AI 供应链助手" aria-label="AI 供应链助手">
+                <i class="fa fa-comments"/>
+            </button>
+            <t t-if="state.open">
+                <Portal>
+                    <div class="sc_ai_panel" role="dialog" aria-label="AI 供应链助手对话">
+                        <div class="sc_ai_header">
+                            <span class="sc_ai_title"><i class="fa fa-robot"/> 供应链 AI 助手</span>
+                            <div class="sc_ai_header_actions">
+                                <button class="sc_ai_btn" t-on-click="newChat" title="新对话">新对话</button>
+                                <button class="sc_ai_btn sc_ai_close" t-on-click="toggle" title="关闭">×</button>
+                            </div>
+                        </div>
+
+                        <div class="sc_ai_messages" t-ref="messages">
+                            <t t-if="state.messages.length === 0 and not state.loading">
+                                <div class="sc_ai_empty">
+                                    你好，我是供应链 AI 助手。可以问我：库存、临期批次、负库存、
+                                    采购订单、供应商交期等。所有查询只读且继承你的数据权限。
+                                </div>
+                            </t>
+                            <t t-foreach="state.messages" t-as="msg" t-key="msg_index">
+                                <div t-att-class="msg.role === 'user' ? 'sc_ai_msg sc_ai_msg_user' : 'sc_ai_msg sc_ai_msg_ai'">
+                                    <t t-esc="msg.content"/>
+                                </div>
+                            </t>
+                            <t t-if="state.loading">
+                                <div class="sc_ai_msg sc_ai_msg_ai sc_ai_loading">AI 思考中…</div>
+                            </t>
+                        </div>
+
+                        <t t-if="state.error">
+                            <div class="sc_ai_error"><t t-esc="state.error"/></div>
+                        </t>
+
+                        <div class="sc_ai_input">
+                            <textarea t-ref="input" t-on-keydown="onKeydown"
+                                      placeholder="输入问题，Enter 发送，Shift+Enter 换行"/>
+                            <button class="sc_ai_send" t-on-click="send"
+                                    t-att-disabled="state.loading ? 'true' : null">发送</button>
+                        </div>
+                    </div>
+                </Portal>
+            </t>
+        </div>
+    </t>
+</templates>
