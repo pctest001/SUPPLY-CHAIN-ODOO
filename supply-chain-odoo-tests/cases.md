@@ -1,6 +1,6 @@
 # supply-chain-odoo-tests 用例目录与验证指南
 
-> 同步自 `测试工程技术方案.md`。当前版本：**40 条用例**（M1 4 + M2 结构型 7 + M2 业务数值 7 + AI 降级 1 + AI 非降级 6 + 多公司 2 + 收货/批次 7 + 产品扩展 3 + 日志追踪 3）。
+> 同步自 `测试工程技术方案.md`。当前版本：**47 条用例**（M1 4 + M2 结构型 7 + M2 业务数值 7 + AI 降级 1 + AI 非降级 6 + 多公司 2 + 收货/批次 7 + 产品扩展 3 + 日志追踪 3 + 供应商确认单动作 7）。
 
 ## 1. 如何验证（拿绿 + 证明有效）
 
@@ -32,9 +32,10 @@ python -m pytest --collect-only -q
 故意改 `custom_addons` 中一处状态机或 `constrains`，重启 odoo 重跑，对应用例应变红，再还原：
 - 改 `sc.purchase.request.action_submit` 不置 `confirmed` → `PR-SUBMIT` 红；
 - 删 `sc.recipe` "至少一种原料" `constrains` → `W-RECIPE-LINE` 红；
-- 删 PO 审批守卫 `button_confirm` 的 `approval_state` 判断 → `PO-APPROVE` 红。
+- 删 PO 审批守卫 `button_confirm` 的 `approval_state` 判断 → `PO-APPROVE` 红；
+- 改 `sc.supplier.ack.action_confirm` 不置 `confirmed` → `ACK-CONFIRM` 红（M4）。
 
-### 1.5 CI 已内置 mutation 门禁（自动化 A2，3 个变异点）
+### 1.5 CI 已内置 mutation 门禁（自动化 A2，4 个变异点）
 门禁逻辑收敛在 `mutation_gate.py`（本地/CI 双用，跨平台）。对每个变异点：
 精确注入 → `restart odoo` 重载 → 只跑对应用例（**期望变红**）→ `finally` 还原源码；
 任一变异未被抓住（用例仍绿）=> 测试过弱 => 退出码非 0 => CI 失败。
@@ -44,13 +45,14 @@ python -m pytest --collect-only -q
 | M1-PR-SUBMIT | `action_submit` 提交后不置 `confirmed`（状态机断裂） | `PR-SUBMIT` |
 | M2-RCPT-NOLOT | C3 收货批次守卫被绕过（无批次也放行） | `test_rcpt_nolot_rejected` |
 | M3-RECIPE-QTY | 配方用量约束 `<=0` 松成 `<0`（零用量放行） | `C-RECIPE-QTY` |
+| M4-ACK-CONFIRM | `action_confirm` 确认后不置 `confirmed`（状态机断裂） | `ACK-CONFIRM` |
 
 本地复现（在已起实例上，约 3-5 分钟）：
 ```powershell
 cd supply-chain-odoo-tests
-python mutation_gate.py    # PASS = 全部 3 个变异均被抓住
+python mutation_gate.py    # PASS = 全部 4 个变异均被抓住
 ```
-最近一次本地结果：`caught=['M1-PR-SUBMIT','M2-RCPT-NOLOT','M3-RECIPE-QTY'] missed=[]`。
+最近一次本地结果：`caught=['M1-PR-SUBMIT','M2-RCPT-NOLOT','M3-RECIPE-QTY','M4-ACK-CONFIRM'] missed=[]`。
 
 ### 1.6 代码行覆盖率（custom_addons）
 黑盒 RPC 用例跑在宿主机、被测代码在 Odoo 容器内，`coverage run -m odoo` 无法测——Odoo 常驻 + 线程/gevent + `--dev` 重载子进程会让真正处理 RPC 的进程不在 coverage 之下（实测 `line_bits=0`，假 0%）。本工程用**子进程自动注入**方案拿到真实覆盖率：
@@ -65,7 +67,7 @@ powershell -ExecutionPolicy Bypass -File run_coverage.ps1
 # 文本报告：cov_report.txt；HTML：covdata/htmlcov/index.html
 ```
 
-最近一次结果（40 条用例，**TOTAL 78.8%**，645 语句 / 137 未覆盖；此前 21 条时为 51.5%）：
+最近一次结果（47 条用例，**TOTAL 82.3%**，645 语句 / 114 未覆盖；此前 21 条时为 51.5%）：
 
 | 模块文件 | Stmts | Miss | Cover | 此前 |
 |---|---|---|---|---|
@@ -77,10 +79,10 @@ powershell -ExecutionPolicy Bypass -File run_coverage.ps1
 | `supply_chain_demo/models/purchase_request.py` | 73 | 17 | 76.7% | 76.7% |
 | `supply_chain_demo/models/odoo_model_demo.py` | 24 | 6 | 75.0% | 75.0% |
 | `supply_chain_demo/models/purchase_order_approval.py` | 32 | 9 | 71.9% | 68.8% |
-| `supply_chain_demo/models/supplier_ack.py` | 69 | 23 | 66.7% | 66.7% |
+| `supply_chain_demo/models/supplier_ack.py` | 69 | 0 | **100.0%** | 66.7% |
 
-CI 中已设 `--fail-under=70` 覆盖率门禁（实测 78.8%，留 ~9pt 余量防抖动）。
-剩余未覆盖主要是：UI onchange、报表/看板 action、supplier_ack 邮件通道等黑盒 RPC 难驱动路径。
+CI 中已设 `--fail-under=70` 覆盖率门禁（实测 82.3%，留 ~12pt 余量防抖动）。
+剩余未覆盖主要是：UI onchange、报表/看板 action 等黑盒 RPC 难驱动路径（此前 §4.4 归为死区的 `supplier_ack` 邮件通道经实测并不存在——其 compute/action/wizard 均为纯逻辑，已通过 RPC 全量覆盖到 100%）。
 
 > 补测过程中顺带抓到一个真 bug：`ai_models._tool_query_expiring_lots` 误用
 > `stock.lot.quantity`（Odoo 18 应为 `product_qty`），此前只测降级路径从未暴露，
@@ -166,11 +168,23 @@ Key 红线不破：`api_key_env` 指向容器内必存在的 `PATH`，Key 内容
 | test_crossco_user_in_other_company | 跨公司测试用户归属第二家公司 |
 | test_pr_company_scoped | 显式 `company_id` 的 PR 被如实记录（公司域写入不变量） |
 
+### 供应商确认单动作（7，`tests/test_supplier_ack.py`，marker `supplierack`）
+| 用例 | 断言（验收清单 §2 E1 / 作品说明 E 供应商协同） |
+|------|------|
+| test_ack_reject | `action_reject` 置 `rejected` 且写入驳回原因 |
+| test_po_supplier_ack_compute | 确认后 PO 的 `supplier_ack_state`/`supplier_committed_date` 被 compute 出 |
+| test_po_register_supplier_ack_action | `action_register_supplier_ack` 返回打开 `sc.supplier.ack.wizard` 的 act_window 且预置 `default_po_id` |
+| test_ack_wizard_confirm_update | 向导确认（PO 已有 ack）经 `_create_or_update_ack` 更新为 `confirmed` |
+| test_ack_wizard_confirm_create | 向导确认（PO 无 ack）经 `_create_or_update_ack` 新建为 `confirmed` |
+| test_ack_wizard_reject_create | 向导拒绝（PO 无 ack）经 `_create_or_update_ack` 新建为 `rejected` |
+| test_ack_wizard_reject_update | 向导拒绝（PO 已有 ack）经 `_create_or_update_ack` 更新为 `rejected` |
+
 ## 3. 按 marker 筛选
 ```powershell
 python -m pytest -m smoke          # 仅 M1 冒烟
 python -m pytest -m business        # 仅 PRD 业务数值
 python -m pytest -m "struct or ai"  # 结构型 + AI
+python -m pytest -m supplierack      # 仅供应商确认单动作
 ```
 
 ## 4. 产物（均被 .gitignore 忽略，本地临时）
