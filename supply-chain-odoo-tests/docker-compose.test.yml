@@ -1,0 +1,59 @@
+# 被测系统（测试专用实例）—— 由测试工程拉起，独立于生产 compose。
+#
+# 设计要点（对应技术方案 v2.1 第 3 节）：
+#   - 这是【被测实例】，必须挂载 custom_addons（supply_chain_demo + sc_ai）才能测业务模型；
+#   - 测试工程自身代码（src/ conftest.py）不挂载，仅作为外部 RPC 客户端经 18069 连接；
+#   - 端口映射到宿主机 18069 / 5433，避免与现有的 8069 / 5432 冲突。
+#
+# 初始化（首次或重置）：
+#   docker compose -f docker-compose.test.yml run --rm odoo odoo -i supply_chain_demo,sc_ai -d test_supplychain --stop-after-init
+#   docker compose -f docker-compose.test.yml up -d odoo
+#   （admin 凭据由模块 post_init_hook 设置：admin@example.com / admin）
+#
+# 日常启动 / 停止：
+#   docker compose -f docker-compose.test.yml up -d
+#   docker compose -f docker-compose.test.yml down
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: odoo
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    ports:
+      - "5433:5432"
+    volumes:
+      - test_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  odoo:
+    image: odoo:18.0
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "18069:8069"
+    environment:
+      - HOST=db
+      - PORT=5432
+      - USER=odoo
+      - PASSWORD=odoo
+      - DB_NAME=test_supplychain
+      # AI Key：未配置时 AI 自动降级（核心供应链功能不受影响）
+      - SUPPLY_AI_API_KEY=${SUPPLY_AI_API_KEY:-}
+    volumes:
+      - ../custom_addons:/mnt/extra-addons
+      - test_odoo_data:/var/lib/odoo
+      - ./logs/odoo:/var/log/odoo
+    command: -- --dev=all --db-filter=^test_supplychain$ --logfile=/var/log/odoo/odoo.log
+    restart: unless-stopped
+
+volumes:
+  test_db_data:
+  test_odoo_data:

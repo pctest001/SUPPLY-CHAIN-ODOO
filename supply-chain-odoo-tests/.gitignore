@@ -1,0 +1,7 @@
+# 测试工程本地产物
+healer_audit.jsonl
+report.xml
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
