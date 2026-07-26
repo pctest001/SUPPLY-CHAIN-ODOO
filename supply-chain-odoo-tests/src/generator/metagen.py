@@ -140,13 +140,88 @@ class BusinessCase(Case):
                 self._cleanup(client, rid)
         if self.mode == "genpo":
             rid = self._make_pr(client, ctx)
+            po_ids = []
             try:
                 client.write(self.model, [rid], {"partner_id": ctx["supplier_id"]})
                 self._call_action(client, self.model, "action_submit", [rid])
                 self._call_action(client, self.model, "action_generate_po", [rid])
-                return self._check(client, rid)
+                rec = client.read(self.model, [rid], ["state", "po_ids"])[0]
+                ok = rec["state"] == self.expect_state
+                detail = f"state={rec['state']}"
+                if self.expect_field:
+                    ok = ok and bool(rec.get(self.expect_field))
+                    detail += f", {self.expect_field}={rec.get(self.expect_field)}"
+                # B6 深度断言：生成的原生采购单字段正确（供应商/明细/公司）
+                po_ids = rec.get("po_ids") or []
+                if not po_ids:
+                    ok = False
+                    detail += ", 未生成PO"
+                else:
+                    po = client.read(
+                        "purchase.order", [po_ids[0]],
+                        ["partner_id", "order_line", "company_id", "origin"],
+                    )[0]
+                    if not po.get("partner_id") or po["partner_id"][0] != ctx["supplier_id"]:
+                        ok = False
+                        detail += ", PO供应商不匹配"
+                    if not po.get("order_line"):
+                        ok = False
+                        detail += ", PO明细为空"
+                    else:
+                        detail += f", PO明细={len(po['order_line'])}行"
+                    if po.get("company_id") and po["company_id"][0] != ctx["company_id"]:
+                        ok = False
+                        detail += ", PO公司不匹配"
+                return ok, detail
             finally:
-                self._cleanup(client, rid)
+                try:
+                    client.unlink(self.model, [rid])
+                except Exception:  # noqa: BLE001 - 清理失败不影响判定
+                    pass
+                for pid in po_ids:
+                    try:
+                        client.unlink("purchase.order", [pid])
+                    except Exception:  # noqa: BLE001 - 清理失败不影响判定
+                        pass
+        if self.mode == "po_approve":
+            # B3 / 验收清单 C2：PO 审批流 草稿→待审→已批，未批禁止确认
+            po_id = client.create("purchase.order", {
+                "partner_id": ctx["supplier_id"],
+                "order_line": [(0, 0, {
+                    "product_id": ctx["ingredient_id"],
+                    "product_uom": ctx["ingredient_uom_id"],
+                    "product_qty": 1.0,
+                    "price_unit": 10.0,  # 金额>0 才能进入审批
+                })],
+            })
+            try:
+                # 未审批禁止确认（[Unwanted] 守卫）
+                try:
+                    client.execute("purchase.order", "button_confirm", [po_id])
+                    blocked = False
+                    block_detail = "未审批却允许确认(守卫缺失)"
+                except xmlrpc.client.Fault:
+                    blocked = True
+                    block_detail = "未审批确认被正确拦截"
+                # 提交审批 -> pending（action 返回 None，经 _call_action 吞掉 marshal None）
+                self._call_action(client, "purchase.order", "action_submit_for_approval", [po_id])
+                st1 = client.read("purchase.order", [po_id], ["approval_state"])[0]["approval_state"]
+                # 审批通过 -> approved，并记录审批人
+                self._call_action(client, "purchase.order", "action_approve", [po_id])
+                rec = client.read("purchase.order", [po_id],
+                                  ["approval_state", "approved_by"])[0]
+                ok = (blocked and st1 == "pending"
+                      and rec["approval_state"] == self.expect_state
+                      and bool(rec["approved_by"]))
+                detail = (f"{block_detail}; submit={st1}; "
+                          f"approve={rec['approval_state']}; approver={rec['approved_by']}")
+                return ok, detail
+            finally:
+                try:
+                    client.unlink("purchase.order", [po_id])
+                except Exception:  # noqa: BLE001 - 清理失败不影响判定
+                    pass
+
         if self.mode == "ack_confirm":
             aid = client.create("sc.supplier.ack", {"po_id": ctx["po_id"]})
             try:

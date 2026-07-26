@@ -24,7 +24,7 @@ PRD_RULES = [
         "desc": "草稿态采购申请添加明细后提交，状态推进为『已提交』",
         "model": "sc.purchase.request",
         "mode": "submit",
-        "expect_state": "confirmed",  # PRD『已提交』在模型中的取值
+        "expect_state": "confirmed"# PRD『已提交』在模型中的取值
     },
     {
         "id": "PR-GENPO",
@@ -42,5 +42,13 @@ PRD_RULES = [
         "model": "sc.supplier.ack",
         "mode": "ack_confirm",
         "expect_state": "confirmed",   # PRD『已确认』在模型中的取值
+    },
+    {
+        "id": "PO-APPROVE",
+        "source": "验收清单.md §2 C2『PO 审批流: 草稿→待审→已批, 未批禁止确认』/ 作品说明.md C 采购 PO审批流",
+        "desc": "未审批PO确认被拒；提交审批后置pending；审批通过后置approved并记录审批人",
+        "model": "purchase.order",
+        "mode": "po_approve",
+        "expect_state": "approved",
     },
 ]
