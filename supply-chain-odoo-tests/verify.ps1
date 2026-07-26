@@ -24,7 +24,7 @@ docker compose -f docker-compose.test.yml stop odoo 2>$null
 
 # 3) 初始化测试库并安装模块（幂等）
 docker compose -f docker-compose.test.yml run --rm odoo odoo `
-    -i supply_chain_demo,sc_ai -d test_supplychain --stop-after-init
+    -i supply_chain_demo,sc_ai,sc_log_trace -d test_supplychain --stop-after-init
 
 # 4) 启动主 odoo 并等待就绪
 docker compose -f docker-compose.test.yml up -d odoo

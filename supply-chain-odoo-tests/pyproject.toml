@@ -14,4 +14,6 @@ markers = [
     "business: M2 业务数值断言 - PRD 来源的状态/字段",
     "ai: AI 智能层降级验证",
     "multicompany: 多公司隔离前置验证",
+    "receipt: 收货/批次/出库守卫（C3/D1/D3/D4）",
+    "logtrace: sc_log_trace 请求追踪",
 ]

@@ -26,11 +26,18 @@ jobs:
           done
           echo "odoo not ready"; docker compose -f docker-compose.test.yml logs odoo; exit 1
 
+      # 覆盖率装在容器持久卷内，CI 全新卷须先装（sitecustomize 缺它会静默不测量）
+      - name: Install coverage inside odoo container
+        working-directory: supply-chain-odoo-tests
+        run: |
+          docker compose -f docker-compose.test.yml exec -T odoo \
+            python3 -m pip install --break-system-packages --quiet coverage
+
       - name: Initialize test DB and install modules
         working-directory: supply-chain-odoo-tests
         run: |
           docker compose -f docker-compose.test.yml run --rm odoo odoo \
-            -i supply_chain_demo,sc_ai -d test_supplychain --stop-after-init
+            -i supply_chain_demo,sc_ai,sc_log_trace -d test_supplychain --stop-after-init
 
       - name: Restart Odoo to load installed modules
         working-directory: supply-chain-odoo-tests
@@ -52,58 +59,31 @@ jobs:
         working-directory: supply-chain-odoo-tests
         run: python -m pytest -v --junitxml=report.xml
 
-      # ---- Mutation testing（A2 自动化）：证明"不是假绿" ----
-      # 注入一处变异（action_submit 提交后不置 confirmed），重启 Odoo 重载，
-      # 期望对应的 PR-SUBMIT 业务用例变红。若变异未被捕获（用例仍绿），
-      # 说明测试太弱，CI 应失败。
-      - name: Apply mutation (action_submit 状态机)
-        run: |
-          python - <<'PY'
-          import re, pathlib
-          p = pathlib.Path("custom_addons/supply_chain_demo/models/purchase_request.py")
-          s = p.read_text(encoding="utf-8")
-          pat = r"self\.write\(\{'state': 'confirmed'\}\)"
-          if not re.search(pat, s):
-              raise SystemExit("mutation target not found")
-          s2 = re.sub(pat, "self.write({'state': 'draft'})  # MUTANT", s, count=1)
-          p.write_text(s2, encoding="utf-8")
-          print("MUTANT APPLIED: action_submit 不再置 confirmed")
-          PY
-
-      - name: Restart Odoo to load mutant
+      # ---- 覆盖率门禁：多进程 sitecustomize 采集，容器内出报告（posix 路径匹配）----
+      # 阈值 70%：最近实测 78.8%（40 条用例），留 ~9pt 余量防抖动。
+      - name: Coverage gate (fail under 70%)
         working-directory: supply-chain-odoo-tests
         run: |
-          docker compose -f docker-compose.test.yml restart odoo
+          docker compose -f docker-compose.test.yml stop odoo   # SIGTERM 触发落盘
+          sleep 6
+          docker compose -f docker-compose.test.yml run --rm odoo \
+            python3 -m coverage combine --data-file=/mnt/covdata/.coverage /mnt/covdata
+          docker compose -f docker-compose.test.yml run --rm odoo \
+            python3 -m coverage report --data-file=/mnt/covdata/.coverage \
+            --precision=1 --fail-under=70 | tee coverage_report.txt
+          docker compose -f docker-compose.test.yml start odoo
           for i in $(seq 1 40); do
             if curl -sf http://localhost:18069/web/login; then echo "odoo ready"; exit 0; fi
             sleep 3
           done
-          echo "odoo not ready"; docker compose -f docker-compose.test.yml logs odoo; exit 1
+          echo "odoo not ready"; exit 1
 
-      - name: Mutation test — expect PR-SUBMIT to FAIL
+      # ---- Mutation 门禁（A2 反假绿）：3 个变异点，任一未被抓住则失败 ----
+      # M1 PR 状态机 / M2 C3 收货批次守卫 / M3 配方用量约束；
+      # 注入-重启-验红-还原全流程由脚本自治（finally 保证还原）。
+      - name: Mutation gate (3 mutants must be caught)
         working-directory: supply-chain-odoo-tests
-        run: |
-          set +e  # 关闭 errexit：pytest 故意失败属预期，不能让脚本在此中止
-          python -m pytest -v tests/test_generated_business.py -k "PR-SUBMIT" -p no:cacheprovider 2>&1 | tee mutation_out.txt
-          rc=${PIPESTATUS[0]}
-          if [ $rc -eq 0 ]; then
-            echo "::error::MUTATION NOT CAUGHT — PR-SUBMIT 在变异后仍通过，测试过弱"
-            exit 1
-          fi
-          grep -q "FAILED" mutation_out.txt || { echo "::error::PR-SUBMIT 未如期失败（环境异常？）"; exit 1; }
-          echo "::notice::MUTATION CAUGHT — PR-SUBMIT 在变异后正确变红"
-
-      - name: Revert mutation
-        if: always()
-        run: |
-          python - <<'PY'
-          import pathlib
-          p = pathlib.Path("custom_addons/supply_chain_demo/models/purchase_request.py")
-          s = p.read_text(encoding="utf-8")
-          s2 = s.replace("self.write({'state': 'draft'})  # MUTANT", "self.write({'state': 'confirmed'})")
-          p.write_text(s2, encoding="utf-8")
-          print("MUTANT REVERTED")
-          PY
+        run: python mutation_gate.py 2>&1 | tee mutation_out.txt; exit ${PIPESTATUS[0]}
 
       - name: Upload JUnit report
         if: always()
@@ -125,3 +105,10 @@ jobs:
         with:
           name: mutation-output
           path: supply-chain-odoo-tests/mutation_out.txt
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: supply-chain-odoo-tests/coverage_report.txt

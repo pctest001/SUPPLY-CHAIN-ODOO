@@ -47,11 +47,23 @@ services:
       - DB_NAME=test_supplychain
       # AI Key：未配置时 AI 自动降级（核心供应链功能不受影响）
       - SUPPLY_AI_API_KEY=${SUPPLY_AI_API_KEY:-}
+      # 覆盖率：让每个 python 进程（含 Odoo re-exec 子进程）自动开启 coverage
+      - COVERAGE_PROCESS_START=/mnt/covdata/.coveragerc
+      - PYTHONPATH=/mnt/covdata/sitecustomize
     volumes:
       - ../custom_addons:/mnt/extra-addons
       - test_odoo_data:/var/lib/odoo
       - ./logs/odoo:/var/log/odoo
-    command: -- --dev=all --db-filter=^test_supplychain$ --logfile=/var/log/odoo/odoo.log
+      - ./covdata:/mnt/covdata
+    command:
+      - odoo
+      - --dev=all
+      - --db_host=db
+      - --db_port=5432
+      - --db_user=odoo
+      - --db_password=odoo
+      - --db-filter=^test_supplychain$
+      - --logfile=/var/log/odoo/odoo.log
     restart: unless-stopped
 
 volumes:

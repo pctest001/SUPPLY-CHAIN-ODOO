@@ -55,7 +55,7 @@ def healed_env(odoo_client: OdooClient) -> dict:
     ok = ensure_environment(odoo_client)
     assert ok, "被测实例不可达，环境层自愈失败（见 healer_audit.jsonl）"
 
-    missing = check_modules_installed(odoo_client, ["supply_chain_demo", "sc_ai"])
+    missing = check_modules_installed(odoo_client, ["supply_chain_demo", "sc_ai", "sc_log_trace"])
     assert not missing, f"模块未安装，需 CI 受控安装: {missing}"
 
     data = ensure_demo_data(odoo_client)
