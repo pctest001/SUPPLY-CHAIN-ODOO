@@ -8,6 +8,10 @@ import xmlrpc.client
 
 from src.healer.audit import get_audit
 
+import pytest
+
+pytestmark = pytest.mark.ai
+
 
 def test_ai_ask_degrades_gracefully(odoo_client):
     """无可用 LLM（测试实例 SUPPLY_AI_API_KEY 为空）时，ask 返回非空降级文本而非崩溃。"""

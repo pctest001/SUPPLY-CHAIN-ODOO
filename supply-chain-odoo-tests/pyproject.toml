@@ -8,3 +8,10 @@ dependencies = ["pytest>=8.0"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "smoke: M1 冒烟 - 实例可达/模块已装/多公司前置",
+    "struct: M2 结构型断言 - 守卫/约束/selection 拦截",
+    "business: M2 业务数值断言 - PRD 来源的状态/字段",
+    "ai: AI 智能层降级验证",
+    "multicompany: 多公司隔离前置验证",
+]

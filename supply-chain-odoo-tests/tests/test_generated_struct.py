@@ -8,6 +8,8 @@ import xmlrpc.client
 
 import pytest
 
+pytestmark = pytest.mark.struct
+
 from src.generator.metagen import all_cases
 from src.healer.audit import get_audit
 

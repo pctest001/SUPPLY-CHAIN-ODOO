@@ -1,6 +1,8 @@
 """M1 验收冒烟：验证被测实例可达、可登录、核心模块已安装、多公司前置就绪。"""
 import pytest
 
+pytestmark = pytest.mark.smoke
+
 
 def test_odoo_reachable(odoo_client):
     assert odoo_client.authenticated_uid

@@ -7,6 +7,8 @@
 """
 import pytest
 
+pytestmark = pytest.mark.business
+
 from src.generator.prdgen import business_cases
 
 CASES = business_cases()

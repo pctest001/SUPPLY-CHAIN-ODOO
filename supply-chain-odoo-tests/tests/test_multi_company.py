@@ -9,6 +9,10 @@
 """
 from src.healer.audit import get_audit
 
+import pytest
+
+pytestmark = pytest.mark.multicompany
+
 
 def test_crossco_user_in_other_company(odoo_client, company_pair, cross_company_user):
     """跨公司测试用户应归属第二家公司。"""
