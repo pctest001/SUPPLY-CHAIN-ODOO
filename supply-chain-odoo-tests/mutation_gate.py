@@ -47,6 +47,14 @@ MUTANTS = [
         "new": "if line.product_qty < 0:  # MUTANT",
         "pytest": ["tests/test_generated_struct.py", "-k", "C-RECIPE-QTY"],
     },
+    {
+        "id": "M4-ACK-CONFIRM",
+        "desc": "供应商确认单确认后不置 confirmed（状态机断裂）",
+        "file": REPO_ROOT / "custom_addons/supply_chain_demo/models/supplier_ack.py",
+        "old": "                'state': 'confirmed',",
+        "new": "                'state': 'draft',  # MUTANT",
+        "pytest": ["tests/test_generated_business.py", "-k", "ACK-CONFIRM"],
+    },
 ]
 
 
