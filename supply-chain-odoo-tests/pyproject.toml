@@ -17,5 +17,6 @@ markers = [
     "receipt: 收货/批次/出库守卫（C3/D1/D3/D4）",
     "supplierack: 供应商确认单动作/compute/向导（E1 供应商协同）",
     "poapproval: 采购订单审批流动作/守卫（C2 采购审批）",
+    "purchaserequest: 采购申请动作/守卫/onchange（C2 前置）",
     "logtrace: sc_log_trace 请求追踪",
 ]
