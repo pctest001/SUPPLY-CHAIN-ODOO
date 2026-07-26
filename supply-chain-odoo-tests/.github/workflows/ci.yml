@@ -52,6 +52,59 @@ jobs:
         working-directory: supply-chain-odoo-tests
         run: python -m pytest -v --junitxml=report.xml
 
+      # ---- Mutation testing（A2 自动化）：证明"不是假绿" ----
+      # 注入一处变异（action_submit 提交后不置 confirmed），重启 Odoo 重载，
+      # 期望对应的 PR-SUBMIT 业务用例变红。若变异未被捕获（用例仍绿），
+      # 说明测试太弱，CI 应失败。
+      - name: Apply mutation (action_submit 状态机)
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          p = pathlib.Path("custom_addons/supply_chain_demo/models/purchase_request.py")
+          s = p.read_text(encoding="utf-8")
+          pat = r"self\.write\(\{'state': 'confirmed'\}\)"
+          if not re.search(pat, s):
+              raise SystemExit("mutation target not found")
+          s2 = re.sub(pat, "self.write({'state': 'draft'})  # MUTANT", s, count=1)
+          p.write_text(s2, encoding="utf-8")
+          print("MUTANT APPLIED: action_submit 不再置 confirmed")
+          PY
+
+      - name: Restart Odoo to load mutant
+        working-directory: supply-chain-odoo-tests
+        run: |
+          docker compose -f docker-compose.test.yml restart odoo
+          for i in $(seq 1 40); do
+            if curl -sf http://localhost:18069/web/login; then echo "odoo ready"; exit 0; fi
+            sleep 3
+          done
+          echo "odoo not ready"; docker compose -f docker-compose.test.yml logs odoo; exit 1
+
+      - name: Mutation test — expect PR-SUBMIT to FAIL
+        working-directory: supply-chain-odoo-tests
+        run: |
+          set +e  # 关闭 errexit：pytest 故意失败属预期，不能让脚本在此中止
+          python -m pytest -v tests/test_generated_business.py -k "PR-SUBMIT" -p no:cacheprovider 2>&1 | tee mutation_out.txt
+          rc=${PIPESTATUS[0]}
+          if [ $rc -eq 0 ]; then
+            echo "::error::MUTATION NOT CAUGHT — PR-SUBMIT 在变异后仍通过，测试过弱"
+            exit 1
+          fi
+          grep -q "FAILED" mutation_out.txt || { echo "::error::PR-SUBMIT 未如期失败（环境异常？）"; exit 1; }
+          echo "::notice::MUTATION CAUGHT — PR-SUBMIT 在变异后正确变红"
+
+      - name: Revert mutation
+        if: always()
+        run: |
+          python - <<'PY'
+          import pathlib
+          p = pathlib.Path("custom_addons/supply_chain_demo/models/purchase_request.py")
+          s = p.read_text(encoding="utf-8")
+          s2 = s.replace("self.write({'state': 'draft'})  # MUTANT", "self.write({'state': 'confirmed'})")
+          p.write_text(s2, encoding="utf-8")
+          print("MUTANT REVERTED")
+          PY
+
       - name: Upload JUnit report
         if: always()
         uses: actions/upload-artifact@v4
@@ -65,3 +118,10 @@ jobs:
         with:
           name: healer-audit
           path: supply-chain-odoo-tests/healer_audit.jsonl
+
+      - name: Upload mutation test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-output
+          path: supply-chain-odoo-tests/mutation_out.txt

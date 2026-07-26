@@ -34,6 +34,31 @@ python -m pytest --collect-only -q
 - 删 `sc.recipe` "至少一种原料" `constrains` → `W-RECIPE-LINE` 红；
 - 删 PO 审批守卫 `button_confirm` 的 `approval_state` 判断 → `PO-APPROVE` 红。
 
+### 1.5 CI 已内置 mutation 门禁（自动化 A2）
+`github.com:.../.github/workflows/ci.yml` 在绿跑之后自动执行：
+1. 注入变异：把 `custom_addons/supply_chain_demo/models/purchase_request.py` 中 `action_submit` 的 `self.write({'state': 'confirmed'})` 改为 `draft`（打 ` # MUTANT` 标记）；
+2. `docker compose restart odoo` 让容器重载变异代码；
+3. 跑 `pytest tests/test_generated_business.py -k "PR-SUBMIT"`，**期望该用例失败**；
+4. 若变异未被捕获（`PR-SUBMIT` 仍绿）则 CI 直接失败（`::error::MUTATION NOT CAUGHT`）；
+5. `if: always()` 还原变异，并上传 `mutation-output` 产物。
+
+本地复现此门禁（在已起实例上）：
+```powershell
+cd supply-chain-odoo-tests
+# 注入变异
+(Get-Content ..\custom_addons\supply_chain_demo\models\purchase_request.py) `
+  -replace "self.write\({'state': 'confirmed'}\)", "self.write({'state': 'draft'})  # MUTANT" `
+  | Set-Content ..\custom_addons\supply_chain_demo\models\purchase_request.py
+docker compose -f docker-compose.test.yml restart odoo
+# 等就绪后
+python -m pytest -v tests/test_generated_business.py -k "PR-SUBMIT"   # 应 FAIL
+# 还原
+(Get-Content ..\custom_addons\supply_chain_demo\models\purchase_request.py) `
+  -replace "self.write\({'state': 'draft'}\)  # MUTANT", "self.write({'state': 'confirmed'})" `
+  | Set-Content ..\custom_addons\supply_chain_demo\models\purchase_request.py
+docker compose -f docker-compose.test.yml restart odoo
+```
+
 ## 2. 用例目录（21 条）
 
 ### M1 冒烟（4，`tests/test_bootstrap.py`，marker `smoke`）
