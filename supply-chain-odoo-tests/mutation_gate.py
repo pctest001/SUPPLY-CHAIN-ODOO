@@ -63,6 +63,14 @@ MUTANTS = [
         "new": "            if False:  # MUTANT (审批守卫被删除)",
         "pytest": ["tests/test_po_approval.py", "-k", "po_confirm_guard_not_approved"],
     },
+    {
+        "id": "M6-PR-GENPO-NOPARTNER",
+        "desc": "删除 action_generate_po 的『无供应商』守卫（无供应商也能生成 PO）",
+        "file": REPO_ROOT / "custom_addons/supply_chain_demo/models/purchase_request.py",
+        "old": "        if not self.partner_id:",
+        "new": "        if False:  # MUTANT (无供应商守卫被删除)",
+        "pytest": ["tests/test_purchase_request.py", "-k", "pr_generate_po_no_partner"],
+    },
 ]
 
 
