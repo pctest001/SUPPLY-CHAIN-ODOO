@@ -55,6 +55,14 @@ MUTANTS = [
         "new": "                'state': 'draft',  # MUTANT",
         "pytest": ["tests/test_generated_business.py", "-k", "ACK-CONFIRM"],
     },
+    {
+        "id": "M5-PO-CONFIRM-GUARD",
+        "desc": "删除 button_confirm 审批守卫（未审批也能确认订单）",
+        "file": REPO_ROOT / "custom_addons/supply_chain_demo/models/purchase_order_approval.py",
+        "old": "            if order.approval_state != 'approved':",
+        "new": "            if False:  # MUTANT (审批守卫被删除)",
+        "pytest": ["tests/test_po_approval.py", "-k", "po_confirm_guard_not_approved"],
+    },
 ]
 
 
