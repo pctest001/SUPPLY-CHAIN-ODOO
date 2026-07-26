@@ -1,6 +1,8 @@
 # supply-chain-odoo-tests 用例目录与验证指南
 
 > 同步自 `测试工程技术方案.md`。当前版本：**59 条用例**（M1 4 + M2 结构型 7 + M2 业务数值 7 + AI 降级 1 + AI 非降级 6 + 多公司 2 + 收货/批次 7 + 产品扩展 3 + 日志追踪 3 + 供应商确认单动作 7 + 采购订单审批 7 + 采购申请 5）。
+>
+> 另有 **UI 自动化 4 条**（Playwright 黑盒浏览器，对应 `演示走查脚本.md` 的 TC-B01/B02），见文末 §5。
 
 ## 1. 如何验证（拿绿 + 证明有效）
 
@@ -216,3 +218,25 @@ python -m pytest -m purchaserequest    # 仅采购申请动作/守卫
 ## 4. 产物（均被 .gitignore 忽略，本地临时）
 - `report.xml`：JUnit 报告（CI 也上传）
 - `healer_audit.jsonl`：三层自愈审计，每次 session 重置，记录 env/config/data 各层动作
+
+## 5. UI 自动化用例（4 条，`ui_tests/`，Playwright 黑盒浏览器）
+
+对应 `演示走查脚本.md` 的 TC-B01/B02（呈现层质量，RPC 黑盒无法覆盖）。跑在当前主实例 `http://localhost:8069`（容器内装 Chromium，宿主机代理白名单无法装浏览器）。
+
+### 运行
+```powershell
+# 前置：主实例已 docker compose up，容器已装 Playwright+Chromium（首次见 run_ui_tests.ps1 注释）
+.\supply-chain-odoo-tests\run_ui_tests.ps1                                  # 全部 UI 用例
+.\supply-chain-odoo-tests\run_ui_tests.ps1 -ExtraArgs "test_b01_login.py"   # 单文件
+```
+
+### 用例目录
+| 用例 | 对应手工用例 | 断言（UI 呈现层） |
+|------|------|------|
+| test_b01_login_page_form | TC-B01 | 登录页含 `#login`/`#password` 与登录按钮（兼容中英文「登录」/「Log in」） |
+| test_b01_login_redirect_home | TC-B01 | 登录后进入主页（非数据库选择页） |
+| test_b01_search_chinese_menus | TC-B01 | 应用菜单含中文业务菜单「采购」「库存」 |
+| test_b02_product_flow_manufacture | TC-B02 | 新建产品→勾「流程制造」→切「库存」页签验证惰性渲染（效期字段出现）；结束放弃不污染数据 |
+
+> 注：TC-B01 手工脚本标题为「登录与全中文化」，实测当前数据库默认语言 `en_US`，登录页按钮显示英文「Log in」；登录后 admin 用户语言 `zh_CN` 才是中文界面。是否全中文化数据库为待拍板的产品决策，非测试缺陷。
+> 后续可继续建设 TC-B03（采购全流程）/ TC-B05（出库效期拦截弹窗）等，逐步覆盖 TC-B01~B09。

@@ -100,3 +100,10 @@ docker compose ps
 19. **G7 OWL 侧边聊天面板**：`sc_ai` 新增 OWL 组件 `AiChatSystray`（顶栏 systray AI 按钮 + 右侧滑出面板，含消息列表 / 输入框 / 发送 / 新对话 / 降级提示），复用后端 `ai.chat.session.ask()`（只读 / 继承 `ir.rule` / 白名单 / 降级天然生效）；新增 3 个面板接口 `get_or_create_session` / `chat` / `new_session`（经 `/web/dataset/call_kw` 调用）。资产注册进 `web.assets_backend`（`sc_ai.scss` + `ai_chat_panel.xml` + `ai_chat_panel.js` + `sc_ai.js`），已验证组件代码完整打包进后台 `web.assets_web.min.js`；真实 HTTP 走查：登录 → GET /web 触发资产编译无报错 → `call_kw` 调 `chat` 返回真实 DeepSeek 库存答复（约 1770 字）。浏览器硬刷新（Ctrl+Shift+R）即可见顶栏 AI 按钮与侧边面板。
 
 自测脚本见 `scripts/`：`init.sh`(可复现初始化)、`verify_login.py`(RPC 登录)、`form_login.py`(表单登录)、`verify_db.sql`(DB 验收)、`ai_test.py`(AI 工具)、`c1_test.py`(C1 采购申请→PO)、`c2_test.py`(C2 审批流+AI 配置校验)、`c3_test.py`(C3 收货批次/效期)、`d1_test.py`(D1 入库/出库端到端)、`d1_demo.py`(D1 演示链路持久化)、`d2_demo.py`(D2 跨仓调拨类型+演示调拨持久化)、`d2_test.py`(D2 跨仓调拨 17 项端到端)、`d3_demo.py`(D3 过期批次+出向交付单持久化，UI 可复现拦截)、`d3_test.py`(D3 效期拦截 12 项端到端)、`d4_demo.py`(D4 负库存/超额收货演示持久化，UI 可复现拦截)、`d4_test.py`(D4 负库存+超额收货 17 项端到端)、`b3_test.py`(B3 配方主数据 12 项端到端)、`b3_demo.py`(B3 演示配方持久化，UI 可查)、`e1_test.py`(E1 供应商协同 15 项端到端)、`e1_demo.py`(E1 演示交期确认持久化，UI 可查)、`b4_demo_data.py`(B4 演示数据灌入)、`b4_verify.py`(B4 数据验证)、`inventory_dashboard.py`(F1 实时库存看板服务：http.server + 直连 psql，开 http://localhost:5000)、`ai_live_test.py`(A4 实时调 DeepSeek)、`reset_admin.py`(可重复重置凭据)、`inspect_type.py`(排查用)、`supplychain_queries.sql`(DBeaver 常用查询：实时库存/各仓汇总/临期预警/跨仓调拨/流程制造物料/出入库/公司仓库)。
+
+## 自动化测试
+
+两套互补的自动化测试，详见 `supply-chain-odoo-tests/`：
+
+- **RPC 黑盒测试（40+ 用例）**：经 XML-RPC/JSON-RPC 驱动 Odoo，验证业务守卫、状态机、PRD 数值、AI、多公司、收货、产品扩展、日志追踪；含行覆盖率度量 + Mutation 反假绿门禁。跑在隔离实例（18069）。
+- **UI 自动化（Playwright 黑盒浏览器）**：真实浏览器驱动 Odoo 前端，验证页面渲染、中文化、菜单导航、字段标签、页签惰性渲染等呈现层质量。当前 4 条用例（对应 `演示走查脚本.md` 的 TC-B01 登录中文化、TC-B02 流程制造），跑在当前主实例 8069（容器内装 Chromium，宿主机代理白名单无法装浏览器）。一键运行：`.\supply-chain-odoo-tests\run_ui_tests.ps1`。
