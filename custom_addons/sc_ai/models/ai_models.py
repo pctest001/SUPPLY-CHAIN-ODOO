@@ -147,12 +147,12 @@ class AiChatSession(models.Model):
         horizon = (date.today() + timedelta(days=int(days))).isoformat()
         rows = Lot.search_read(
             [('expiration_date', '<=', horizon), ('expiration_date', '>=', date.today().isoformat())],
-            ['name', 'product_id', 'expiration_date', 'quantity'],
+            ['name', 'product_id', 'expiration_date', 'product_qty'],
             limit=min(int(limit), 200))
         return [{'lot': r['name'],
                  'product': r['product_id'][1] if r['product_id'] else '',
                  'expiry': str(r['expiration_date'])[:10],
-                 'qty': r['quantity']}
+                 'qty': r['product_qty']}
                 for r in rows]
 
     def _tool_query_low_stock(self, limit=50):
