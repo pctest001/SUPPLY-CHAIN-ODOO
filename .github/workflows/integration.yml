@@ -55,28 +55,6 @@ jobs:
           docker compose -f docker-compose.test.yml exec -T odoo \
             bash -c 'rm -f /var/lib/odoo/.local/lib/python3*/site-packages/a1_coverage.pth'
 
-      # 诊断步骤（排障用，问题定位后可删）：确认 coverage/gevent 可导入、
-      # site-packages 内容、神秘 a1_coverage.pth 的内容与来源
-      - name: Diagnose coverage runtime
-        working-directory: supply-chain-odoo-tests
-        run: |
-          docker compose -f docker-compose.test.yml exec -T odoo bash -c '
-            echo "== python/coverage/gevent 版本 =="
-            python3 -c "import sys; print(sys.version)"
-            python3 -c "import coverage; print(\"coverage\", coverage.__version__)" || true
-            python3 -c "import gevent; print(\"gevent\", gevent.__version__)" || true
-            echo "== 用户 site-packages 一览 =="
-            ls -la /var/lib/odoo/.local/lib/python3.12/site-packages/ 2>/dev/null || true
-            echo "== pth 文件内容 =="
-            for f in /var/lib/odoo/.local/lib/python3.12/site-packages/*.pth; do
-              [ -f "$f" ] && echo "--- $f ---" && cat "$f"
-            done || true
-            echo "== COVERAGE_PROCESS_START / PYTHONPATH =="
-            env | grep -E "COVERAGE|PYTHONPATH" || true
-            echo "== /mnt/covdata 内容 =="
-            ls -la /mnt/covdata/ || true
-          '
-
       - name: Initialize test DB and install modules
         working-directory: supply-chain-odoo-tests
         run: |
