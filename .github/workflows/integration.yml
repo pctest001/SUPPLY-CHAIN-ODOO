@@ -1,10 +1,16 @@
 name: Supply-Chain Odoo Integration Tests
 
+# 历史注记：本工作流原位于 supply-chain-odoo-tests/.github/workflows/ci.yml，
+# 因不在仓库根 .github/workflows/ 下从未被 GitHub 触发（覆盖率+mutation 门禁
+# 一直失效）。2026-07-28 移至根目录激活；step 内容零改动（均自带
+# working-directory，本就按仓库根运行设计），仅补 edited 触发与手动触发。
 on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   integration:
@@ -78,10 +84,10 @@ jobs:
           done
           echo "odoo not ready"; exit 1
 
-      # ---- Mutation 门禁（A2 反假绿）：3 个变异点，任一未被抓住则失败 ----
-      # M1 PR 状态机 / M2 C3 收货批次守卫 / M3 配方用量约束；
-      # 注入-重启-验红-还原全流程由脚本自治（finally 保证还原）。
-      - name: Mutation gate (3 mutants must be caught)
+      # ---- Mutation 门禁（A2 反假绿）：6 个变异点（M1–M6），任一未被抓住则失败 ----
+      # M1 PR状态机 / M2 C3收货批次守卫 / M3 配方用量约束 / M4 供应商确认状态机
+      # / M5 PO审批守卫 / M6 无供应商守卫；注入-重启-验红-还原由脚本自治（finally 还原）。
+      - name: Mutation gate (6 mutants must be caught)
         working-directory: supply-chain-odoo-tests
         run: python mutation_gate.py 2>&1 | tee mutation_out.txt; exit ${PIPESTATUS[0]}
 
