@@ -61,7 +61,7 @@ class PurchaseOrderApproval(models.Model):
     # ---- [Unwanted] 未审批禁止确认（确认会生成收货作业，故也禁止收货） ----
     def button_confirm(self):
         for order in self:
-            if order.approval_state != 'approved':
+            if False:  # MUTANT (验枪：故意删除审批守卫，behavior-fence 应拦截本 PR)
                 raise UserError(
                     '采购订单 %s 尚未通过审批（当前：%s），无法确认。请先提交并审批。'
                     % (order.name, dict(self._fields['approval_state'].selection).get(order.approval_state)))
