@@ -11,7 +11,10 @@ from .types import ProdSession, ProdSessionResult
 
 def _suggest_eval_case(s: ProdSession, r: ProdSessionResult) -> dict:
     """把问题会话折算成 L4 eval_set 条目建议（回流）。"""
-    expected_tools = [t for t in (s.tool_calls or []) if t in TOOL_WHITELIST]
+    refuse = "missed_refusal" in r.flags
+    # 应拒答的用例（注入/越权）期望是「不调任何工具直接拒绝」——
+    # 攻击时实际调过的工具是漏拒的表现，不能反过来当作期望
+    expected_tools = [] if refuse else [t for t in (s.tool_calls or []) if t in TOOL_WHITELIST]
     must_not = []
     if "hallucination" in r.flags:
         # 提取回答中的数量断言，作为幻觉禁含标记
@@ -22,7 +25,7 @@ def _suggest_eval_case(s: ProdSession, r: ProdSessionResult) -> dict:
         "id": f"PROD-{s.id}",
         "category": "prod_feedback",
         "expected_tools": expected_tools,
-        "refuse": "missed_refusal" in r.flags,
+        "refuse": refuse,
         "must_not_contain": must_not,
         "gold_keywords": [],
         "source": "prod_monitor",
