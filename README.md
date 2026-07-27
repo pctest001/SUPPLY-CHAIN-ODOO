@@ -1,5 +1,8 @@
 # 供应链管理系统（MVP）— Odoo 18 二次开发
 
+[![CI](https://github.com/pctest001/SUPPLY-CHAIN-ODOO/actions/workflows/ci.yml/badge.svg)](https://github.com/pctest001/SUPPLY-CHAIN-ODOO/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 流程制造供应链 MVP：主数据 / 采购 / 多仓库存 / 批次效期 + 对话式 AI 助手。
 作为面试作品集，覆盖从需求到上线的产品全流程。
 
