@@ -98,7 +98,7 @@ jobs:
 
       - name: Run UI tests inside the container
         run: |
-          docker compose exec -T odoo bash -c "cd /mnt/ui_tests && python3 -m pytest -v -p no:cacheprovider --junitxml=report.xml"
+          docker compose exec -u root -T odoo bash -c "cd /mnt/ui_tests && python3 -m pytest -v -p no:cacheprovider --junitxml=report.xml"
           CID=$(docker compose ps -q odoo)
           docker cp "$CID:/mnt/ui_tests/report.xml" supply-chain-odoo-tests/ui_tests/report.xml
 
