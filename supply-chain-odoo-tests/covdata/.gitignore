@@ -1,0 +1,6 @@
+# 覆盖率运行时数据（进程退出/收到 SIGTERM 时生成），不纳入版本管理。
+# 保留：sitecustomize/、.coveragerc、本 .gitignore（覆盖率方案的固定资产）。
+.coverage
+.coverage.*
+htmlcov/
+sitecustomize/__pycache__/

@@ -1,10 +1,16 @@
 name: Supply-Chain Odoo Integration Tests
 
+# 历史注记：本工作流原位于 supply-chain-odoo-tests/.github/workflows/ci.yml，
+# 因不在仓库根 .github/workflows/ 下从未被 GitHub 触发（覆盖率+mutation 门禁
+# 一直失效）。2026-07-28 移至根目录激活；step 内容零改动（均自带
+# working-directory，本就按仓库根运行设计），仅补 edited 触发与手动触发。
 on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   integration:
@@ -12,6 +18,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # covdata/（.coveragerc + sitecustomize/）由 checkout 产生，归 runner 所有；
+      # 容器内 odoo 用户(uid 101)要往里写 .coverage.* 数据文件，须先放开写权限，
+      # 否则覆盖率静默不落盘 → combine 报 No data to combine（与 logs/ sudo 同类坑）
+      - name: Make covdata writable for container user
+        working-directory: supply-chain-odoo-tests
+        run: chmod -R 0777 covdata
 
       - name: Start被测 Odoo + Postgres (docker compose)
         working-directory: supply-chain-odoo-tests
@@ -26,12 +39,43 @@ jobs:
           done
           echo "odoo not ready"; docker compose -f docker-compose.test.yml logs odoo; exit 1
 
-      # 覆盖率装在容器持久卷内，CI 全新卷须先装（sitecustomize 缺它会静默不测量）
+      # 覆盖率装在容器持久卷内，CI 全新卷须先装（sitecustomize 缺它会静默不测量）。
+      # gevent 一并装：.coveragerc 的 concurrency=thread,gevent 依赖它，而 odoo:18.0
+      # 是滚动 tag，CI 现拉的新镜像可能没有 gevent（本地旧镜像有 24.2.1，已实测漂移；
+      # 缺它时 coverage 启动抛 ConfigError 被 sitecustomize 的 except 静默吞掉→零数据）
       - name: Install coverage inside odoo container
         working-directory: supply-chain-odoo-tests
         run: |
           docker compose -f docker-compose.test.yml exec -T odoo \
-            python3 -m pip install --break-system-packages --quiet coverage
+            python3 -m pip install --break-system-packages --quiet coverage gevent
+          # coverage 7.x wheel 自带的 a1_coverage.pth 会在 site 早期抢先启动并中毒
+          #（gevent 此刻不可见 → cov.start() 炸但状态已污染 → 后续启动被静默跳过，
+          # 详见 covdata/sitecustomize/sitecustomize.py 注记）。sitecustomize 已能
+          # force=True 兜底，但删掉 pth 可同时消除噪音报错与状态污染源。
+          docker compose -f docker-compose.test.yml exec -T odoo \
+            bash -c 'rm -f /var/lib/odoo/.local/lib/python3*/site-packages/a1_coverage.pth'
+
+      # 诊断步骤（排障用，问题定位后可删）：确认 coverage/gevent 可导入、
+      # site-packages 内容、神秘 a1_coverage.pth 的内容与来源
+      - name: Diagnose coverage runtime
+        working-directory: supply-chain-odoo-tests
+        run: |
+          docker compose -f docker-compose.test.yml exec -T odoo bash -c '
+            echo "== python/coverage/gevent 版本 =="
+            python3 -c "import sys; print(sys.version)"
+            python3 -c "import coverage; print(\"coverage\", coverage.__version__)" || true
+            python3 -c "import gevent; print(\"gevent\", gevent.__version__)" || true
+            echo "== 用户 site-packages 一览 =="
+            ls -la /var/lib/odoo/.local/lib/python3.12/site-packages/ 2>/dev/null || true
+            echo "== pth 文件内容 =="
+            for f in /var/lib/odoo/.local/lib/python3.12/site-packages/*.pth; do
+              [ -f "$f" ] && echo "--- $f ---" && cat "$f"
+            done || true
+            echo "== COVERAGE_PROCESS_START / PYTHONPATH =="
+            env | grep -E "COVERAGE|PYTHONPATH" || true
+            echo "== /mnt/covdata 内容 =="
+            ls -la /mnt/covdata/ || true
+          '
 
       - name: Initialize test DB and install modules
         working-directory: supply-chain-odoo-tests
@@ -66,6 +110,8 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml stop odoo   # SIGTERM 触发落盘
           sleep 6
+          echo "== 落盘现场：covdata/（应出现 .coverage.* 数据文件）=="
+          ls -la covdata/ || true
           docker compose -f docker-compose.test.yml run --rm odoo \
             python3 -m coverage combine --data-file=/mnt/covdata/.coverage /mnt/covdata
           docker compose -f docker-compose.test.yml run --rm odoo \
@@ -78,10 +124,10 @@ jobs:
           done
           echo "odoo not ready"; exit 1
 
-      # ---- Mutation 门禁（A2 反假绿）：3 个变异点，任一未被抓住则失败 ----
-      # M1 PR 状态机 / M2 C3 收货批次守卫 / M3 配方用量约束；
-      # 注入-重启-验红-还原全流程由脚本自治（finally 保证还原）。
-      - name: Mutation gate (3 mutants must be caught)
+      # ---- Mutation 门禁（A2 反假绿）：6 个变异点（M1–M6），任一未被抓住则失败 ----
+      # M1 PR状态机 / M2 C3收货批次守卫 / M3 配方用量约束 / M4 供应商确认状态机
+      # / M5 PO审批守卫 / M6 无供应商守卫；注入-重启-验红-还原由脚本自治（finally 还原）。
+      - name: Mutation gate (6 mutants must be caught)
         working-directory: supply-chain-odoo-tests
         run: python mutation_gate.py 2>&1 | tee mutation_out.txt; exit ${PIPESTATUS[0]}
 

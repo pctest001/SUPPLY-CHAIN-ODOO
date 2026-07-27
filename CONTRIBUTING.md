@@ -45,7 +45,13 @@ cd supply-chain-odoo-tests
 
 推送到 `main` 或开 PR 会触发 GitHub Actions（`.github/workflows/ci.yml`）：
 - **rpc-tests**：起隔离实例 → 装模块 → 外部 pytest 驱动（生成 `report.xml` 产物）。
-- **ui-tests**：主实例 → 容器内装 Playwright/Chromium → 复制 `ui_tests` 进容器 → 跑浏览器用例。
+- **ui-tests**：主实例（加载 zh_CN、admin 中文界面）→ 容器内装 Playwright/Chromium → 复制 `ui_tests` 进容器 → 以 root 跑浏览器用例。
+- **ai-eval / prod-monitor**：离线评测与生产监控门禁（含裁判变异集）。
+- **req-gate / behavior-fence**（仅 PR）：需求引用门禁 + 行为围栏双实例差分。
+
+另有 `.github/workflows/integration.yml`（原误放于 `supply-chain-odoo-tests/.github/workflows/` 下未生效，2026-07-28 迁移激活）：
+- **integration**：隔离实例全量 pytest + **覆盖率门禁**（fail-under 70）+ **Mutation 门禁**（M1–M6 六变异点，任一漏抓即红）。
+- **qa-reports**：聚合 L4 评测/L6 监控/覆盖率，产出 `dashboard.html` 与 Step Summary。
 
 > 注：本机若处于受限网络（仅白名单域名可通），容器外无法装浏览器内核，UI 测试只能在可直连外网的 Odoo 容器内运行——与 CI 行为一致。
 

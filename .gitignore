@@ -17,7 +17,10 @@ Thumbs.db
 .idea/
 
 # ===== 测试产物（覆盖率数据/报告/pytest 输出，非源码）=====
-covdata/
+# 注意：不能一刀切忽略 covdata/ —— 其下 .coveragerc / sitecustomize/ / .gitignore
+# 是覆盖率方案的固定资产，必须入库供 CI 使用（2026-07-28 前被本行整目录忽略，
+# 导致 CI checkout 后 COVERAGE_PROCESS_START 指向不存在的文件、覆盖率静默不测量）。
+# 运行时数据(.coverage*/htmlcov)由 covdata/.gitignore 自行忽略，此处无需重复。
 cov_report.txt
 report.xml
 *.log
