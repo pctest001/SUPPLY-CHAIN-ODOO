@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 两套黑盒测试：
+#  - rpc-tests：外部 pytest 客户端经 XML-RPC 驱动隔离实例(18069)，验证业务守卫/状态机/数值（59 条）
+#  - ui-tests：Playwright 装在 Odoo 容器内，真实浏览器驱动主实例(8069)，验证呈现层（B01/B02）
+# 两者都不 import odoo、都不修改 SUT 业务代码（黑盒红线）。
+
+jobs:
+  rpc-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start test database
+        working-directory: supply-chain-odoo-tests
+        run: docker compose -f docker-compose.test.yml up -d db
+
+      - name: Init test DB and install modules
+        working-directory: supply-chain-odoo-tests
+        run: docker compose -f docker-compose.test.yml run --rm odoo odoo -i supply_chain_demo,sc_ai,sc_log_trace -d test_supplychain --stop-after-init
+
+      - name: Start Odoo (isolated instance :18069)
+        working-directory: supply-chain-odoo-tests
+        run: docker compose -f docker-compose.test.yml up -d odoo
+
+      - name: Wait for Odoo
+        working-directory: supply-chain-odoo-tests
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:18069/web/login; then echo "odoo ready"; exit 0; fi
+            sleep 3
+          done
+          echo "odoo not ready"; docker compose -f docker-compose.test.yml logs odoo; exit 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test deps
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run RPC black-box tests
+        working-directory: supply-chain-odoo-tests
+        run: python -m pytest -v --junitxml=report.xml
+
+      - name: Upload RPC report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpc-junit-report
+          path: supply-chain-odoo-tests/report.xml
+
+  ui-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start database
+        run: docker compose up -d db
+
+      - name: Init DB and install modules (main instance :8069)
+        run: docker compose run --rm odoo odoo -i supply_chain_demo,sc_ai -d supplychain --stop-after-init
+
+      - name: Start Odoo
+        run: docker compose up -d odoo
+
+      - name: Wait for Odoo
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8069/web/login; then echo "odoo ready"; exit 0; fi
+            sleep 3
+          done
+          echo "odoo not ready"; docker compose logs odoo; exit 1
+
+      - name: Install Playwright + Chromium inside the Odoo container
+        run: docker compose exec -u root odoo bash -c "pip install -q --break-system-packages pytest playwright pytest-playwright && python3 -m playwright install chromium && python3 -m playwright install-deps chromium"
+
+      - name: Copy UI tests into container
+        run: |
+          docker compose exec -u root odoo mkdir -p /mnt/ui_tests
+          CID=$(docker compose ps -q odoo)
+          docker cp supply-chain-odoo-tests/ui_tests/. "$CID:/mnt/ui_tests/"
+
+      - name: Run UI tests inside the container
+        run: |
+          docker compose exec -T odoo bash -c "cd /mnt/ui_tests && python3 -m pytest -v -p no:cacheprovider --junitxml=report.xml"
+          CID=$(docker compose ps -q odoo)
+          docker cp "$CID:/mnt/ui_tests/report.xml" supply-chain-odoo-tests/ui_tests/report.xml
+
+      - name: Upload UI report (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-junit-report
+          path: supply-chain-odoo-tests/ui_tests/report.xml
