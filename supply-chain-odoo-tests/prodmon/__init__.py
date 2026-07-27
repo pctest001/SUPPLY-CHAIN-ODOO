@@ -20,3 +20,4 @@ from .metrics import compute_prod_metrics, compare_to_baseline  # noqa: F401
 from .alerting import evaluate_alerts, write_alert, DEFAULT_THRESHOLDS  # noqa: F401
 from .badcase import capture_bad_cases  # noqa: F401
 from .versioning import analyze_versions, diff_prompt, PROMPT_REGISTRY  # noqa: F401
+from .notify import dispatch as notify_dispatch, load_alert, format_markdown  # noqa: F401

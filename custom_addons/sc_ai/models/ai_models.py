@@ -93,6 +93,31 @@ class AiChatMessage(models.Model):
     sequence = fields.Integer(default=0)
 
 
+class AiChatToolLog(models.Model):
+    """L6 生产监控留痕：每一次工具调用的结构化日志。
+
+    此前 ask() 只在 ai.chat.message 落「用户问题 + 最终回答」，工具调用/返回只存在于
+    _call_llm 的内存消息里、请求结束即丢弃，导致 live 监控（prodmon RpcCollector）只能
+    拿到 tool_calls=[]、无法精测工具准确率与安全。本模型把每次 _dispatch_tool 的执行
+    持久化（名称/入参/返回/状态/是否白名单内），供 RpcCollector 精确回填 ProdSession。
+    """
+    _name = 'ai.chat.tool.log'
+    _description = 'AI 工具调用日志（L6 生产监控留痕）'
+    _order = 'sequence, id'
+
+    session_id = fields.Many2one('ai.chat.session', ondelete='cascade', index=True)
+    sequence = fields.Integer(default=0, index=True)
+    tool_name = fields.Char(string='工具名', index=True)
+    tool_args = fields.Text(string='入参(JSON)')
+    tool_result = fields.Text(string='返回(JSON)')
+    status = fields.Selection([
+        ('ok', '成功'),
+        ('error', '执行错误'),
+        ('blocked', '已拒绝(疑似注入/白名单外)'),
+    ], string='状态', default='ok', index=True)
+    is_whitelisted = fields.Boolean(string='是否白名单内', default=True)
+
+
 class AiChatSession(models.Model):
     _name = 'ai.chat.session'
     _description = 'AI 对话会话'
@@ -272,9 +297,28 @@ class AiChatSession(models.Model):
         if msg.get('tool_calls'):
             messages.append({'role': 'assistant', 'content': msg.get('content', ''),
                              'tool_calls': msg['tool_calls']})
-            for tc in msg['tool_calls']:
+            base = self.env['ai.chat.tool.log'].search_count([('session_id', '=', self.id)])
+            for idx, tc in enumerate(msg['tool_calls']):
                 fn = tc['function']
-                result = self._dispatch_tool(fn['name'], _safe_json(fn.get('arguments')))
+                name = fn['name']
+                args = fn.get('arguments')
+                result = self._dispatch_tool(name, _safe_json(args))
+                # L6 留痕：持久化每一次工具调用（名称/入参/返回/状态），
+                # 使 live 监控(prodmon RpcCollector)能精确回填 tool_calls / tool_results，
+                # 进而精测工具准确率与安全（此前该信息随请求结束即丢弃）。
+                if isinstance(result, dict) and result.get('error'):
+                    status = 'blocked' if str(result.get('error', '')).startswith('拒绝') else 'error'
+                else:
+                    status = 'ok'
+                self.env['ai.chat.tool.log'].create({
+                    'session_id': self.id,
+                    'sequence': base + idx + 1,
+                    'tool_name': name,
+                    'tool_args': json.dumps(args or {}, ensure_ascii=False),
+                    'tool_result': json.dumps(result, ensure_ascii=False, default=str),
+                    'status': status,
+                    'is_whitelisted': name in AI_TOOL_WHITELIST,
+                })
                 messages.append({'role': 'tool', 'tool_call_id': tc['id'],
                                  'content': json.dumps(result, ensure_ascii=False, default=str)})
             payload['messages'] = messages

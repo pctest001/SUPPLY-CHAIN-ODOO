@@ -14,3 +14,4 @@ eval/effectiveness_report.json
 prodmon/prod_report.json
 prodmon/prod_alert.json
 prodmon/bad_cases.jsonl
+prodmon/notify.log

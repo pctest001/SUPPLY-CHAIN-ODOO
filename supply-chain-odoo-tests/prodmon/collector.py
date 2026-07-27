@@ -54,6 +54,15 @@ class RpcCollector(ProductionCollector):
         rows = self.client.read(
             "ai.chat.session", ids,
             ["message_ids", "model_used", "prompt_version", "user_id", "create_date"])
+        # 工具调用日志（sc_ai 已落 ai.chat.tool.log）→ 精确回填 tool_calls/tool_results
+        tool_rows = self.client.search_read(
+            "ai.chat.tool.log", [("session_id", "in", ids)],
+            ["session_id", "tool_name", "tool_result", "status"],
+            order="sequence asc") if ids else []
+        tools_by_session: dict[str, list] = {}
+        for t in tool_rows:
+            sid = str(t["session_id"][0] if isinstance(t["session_id"], (list, tuple)) else t["session_id"])
+            tools_by_session.setdefault(sid, []).append(t)
         out: list[ProdSession] = []
         for r in rows:
             msg_ids = r.get("message_ids") or []
@@ -65,9 +74,20 @@ class RpcCollector(ProductionCollector):
                     question = m["content"]
                 elif m["role"] == "assistant":
                     answer = m["content"]
+            sid = str(r["id"])
+            tlogs = tools_by_session.get(sid, [])
+            tool_calls = [t.get("tool_name") for t in tlogs]
+            tool_results = []
+            for t in tlogs:
+                tr = t.get("tool_result") or "{}"
+                try:
+                    tool_results.append(json.loads(tr))
+                except Exception:
+                    tool_results.append({})
             out.append(ProdSession(
-                id=str(r["id"]), question=question, answer=answer,
-                tool_calls=[],  # 注：当前 sc_ai 未在消息里落 tool_call，live 模式安全判定受限
+                id=sid, question=question, answer=answer,
+                tool_calls=tool_calls,  # live 模式现已精确（源自 ai.chat.tool.log）
+                tool_results=tool_results,
                 prompt_version=r.get("prompt_version") or "unknown",
                 model_used=r.get("model_used") or "unknown",
                 user_id=str(r.get("user_id") or ""),
