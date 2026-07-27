@@ -1,0 +1,7 @@
+[run]
+# 多进程（Odoo re-exec / 子进程）各自写独立数据文件，最后 coverage combine 合并
+parallel = true
+concurrency = thread,gevent
+sigterm = true
+source = /mnt/extra-addons
+data_file = /mnt/covdata/.coverage

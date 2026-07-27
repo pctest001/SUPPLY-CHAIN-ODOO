@@ -19,6 +19,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # covdata/（.coveragerc + sitecustomize/）由 checkout 产生，归 runner 所有；
+      # 容器内 odoo 用户(uid 101)要往里写 .coverage.* 数据文件，须先放开写权限，
+      # 否则覆盖率静默不落盘 → combine 报 No data to combine（与 logs/ sudo 同类坑）
+      - name: Make covdata writable for container user
+        working-directory: supply-chain-odoo-tests
+        run: chmod -R 0777 covdata
+
       - name: Start被测 Odoo + Postgres (docker compose)
         working-directory: supply-chain-odoo-tests
         run: docker compose -f docker-compose.test.yml up -d
