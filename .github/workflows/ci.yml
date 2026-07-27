@@ -205,7 +205,7 @@ jobs:
         env:
           FENCE_BASE_ADDONS: ${{ github.workspace }}/base-src/custom_addons
         run: |
-          mkdir -p logs/odoo-base
+          sudo mkdir -p logs/odoo-base
           docker compose -f docker-compose.base.yml -p fence-base run --rm odoo odoo -i supply_chain_demo,sc_ai -d test_supplychain --stop-after-init
           docker compose -f docker-compose.base.yml -p fence-base up -d odoo
 
