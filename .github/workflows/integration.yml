@@ -39,12 +39,15 @@ jobs:
           done
           echo "odoo not ready"; docker compose -f docker-compose.test.yml logs odoo; exit 1
 
-      # 覆盖率装在容器持久卷内，CI 全新卷须先装（sitecustomize 缺它会静默不测量）
+      # 覆盖率装在容器持久卷内，CI 全新卷须先装（sitecustomize 缺它会静默不测量）。
+      # gevent 一并装：.coveragerc 的 concurrency=thread,gevent 依赖它，而 odoo:18.0
+      # 是滚动 tag，CI 现拉的新镜像可能没有 gevent（本地旧镜像有 24.2.1，已实测漂移；
+      # 缺它时 coverage 启动抛 ConfigError 被 sitecustomize 的 except 静默吞掉→零数据）
       - name: Install coverage inside odoo container
         working-directory: supply-chain-odoo-tests
         run: |
           docker compose -f docker-compose.test.yml exec -T odoo \
-            python3 -m pip install --break-system-packages --quiet coverage
+            python3 -m pip install --break-system-packages --quiet coverage gevent
 
       - name: Initialize test DB and install modules
         working-directory: supply-chain-odoo-tests
