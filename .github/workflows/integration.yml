@@ -48,6 +48,12 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml exec -T odoo \
             python3 -m pip install --break-system-packages --quiet coverage gevent
+          # coverage 7.x wheel 自带的 a1_coverage.pth 会在 site 早期抢先启动并中毒
+          #（gevent 此刻不可见 → cov.start() 炸但状态已污染 → 后续启动被静默跳过，
+          # 详见 covdata/sitecustomize/sitecustomize.py 注记）。sitecustomize 已能
+          # force=True 兜底，但删掉 pth 可同时消除噪音报错与状态污染源。
+          docker compose -f docker-compose.test.yml exec -T odoo \
+            bash -c 'rm -f /var/lib/odoo/.local/lib/python3*/site-packages/a1_coverage.pth'
 
       # 诊断步骤（排障用，问题定位后可删）：确认 coverage/gevent 可导入、
       # site-packages 内容、神秘 a1_coverage.pth 的内容与来源
