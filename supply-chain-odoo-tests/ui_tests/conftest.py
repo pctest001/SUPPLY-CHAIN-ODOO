@@ -22,6 +22,16 @@ ADMIN_PASSWORD = os.getenv("UI_ADMIN_PASSWORD", "admin")
 
 
 @pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """CI 容器内以 root 运行 Chromium 必须加 --no-sandbox（Chromium 安全限制：
+    root + sandbox 直接拒启，导致 page fixture 初始化 ERROR）。本地非 root 运行不受影响。"""
+    args = list(browser_type_launch_args.get("args", []))
+    if "--no-sandbox" not in args:
+        args.append("--no-sandbox")
+    return {**browser_type_launch_args, "args": args}
+
+
+@pytest.fixture(scope="session")
 def base_url() -> str:
     return BASE_URL
 
