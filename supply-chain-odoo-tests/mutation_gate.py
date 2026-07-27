@@ -135,10 +135,27 @@ def main():
         if not restart_odoo_and_wait():
             print("[gate] 警告：odoo 恢复后未就绪，请手动检查", flush=True)
     print(f"\n[gate] 结果: caught={caught} missed={missed}")
+    # 落结构化产物，供有效性度量（逃逸率/拦截率）消费
+    _write_artifact(caught, missed)
     if missed:
         print(f"[gate] FAIL — {len(missed)} 个变异未被测试抓住")
         sys.exit(1)
     print(f"[gate] PASS — 全部 {len(caught)} 个变异均被抓住")
+
+
+def _write_artifact(caught, missed):
+    """写出 mutation_out.json（拦截率/逃逸率 数据源）。"""
+    import json
+    from pathlib import Path
+    out = Path(__file__).resolve().parent / "mutation_out.json"
+    out.write_text(json.dumps({
+        "total": len(MUTANTS),
+        "caught": caught,
+        "missed": missed,
+        "intercept_rate": round(100.0 * len(caught) / len(MUTANTS), 1) if MUTANTS else 0.0,
+        "escape_rate": round(100.0 * len(missed) / len(MUTANTS), 1) if MUTANTS else 0.0,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[gate] 已写出 {out.name}")
 
 
 if __name__ == "__main__":

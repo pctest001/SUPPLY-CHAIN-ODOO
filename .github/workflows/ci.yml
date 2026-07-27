@@ -99,3 +99,35 @@ jobs:
         with:
           name: ui-junit-report
           path: supply-chain-odoo-tests/ui_tests/report.xml
+
+  # L4 AI 评测 + §8 有效性度量：纯离线，无需 Odoo/docker，作为 AI 质量门禁。
+  ai-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: AI 评测门禁 (L4)
+        working-directory: supply-chain-odoo-tests
+        run: python -m eval.run_eval --mode sim --fail-under 80
+
+      - name: AI 评测 pytest 断言
+        working-directory: supply-chain-odoo-tests
+        run: python -m pytest tests/test_eval.py -v
+
+      - name: 体系有效性度量 (§8)
+        working-directory: supply-chain-odoo-tests
+        run: python -m eval.effectiveness
+
+      - name: Upload AI eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-eval-report
+          path: |
+            supply-chain-odoo-tests/eval/eval_report.json
+            supply-chain-odoo-tests/eval/effectiveness_report.json

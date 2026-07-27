@@ -5,3 +5,7 @@ report.xml
 __pycache__/
 *.pyc
 *.pyo
+
+# AI 评测层：保留回归基线，忽略逐次运行报告
+eval/eval_report.json
+eval/effectiveness_report.json

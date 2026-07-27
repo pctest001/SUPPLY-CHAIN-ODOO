@@ -1,0 +1,14 @@
+{
+  "total": 6,
+  "caught": [
+    "M1-PR-SUBMIT",
+    "M2-RCPT-NOLOT",
+    "M3-RECIPE-QTY",
+    "M4-ACK-CONFIRM",
+    "M5-PO-CONFIRM-GUARD",
+    "M6-PR-GENPO-NOPARTNER"
+  ],
+  "missed": [],
+  "intercept_rate": 100.0,
+  "escape_rate": 0.0
+}

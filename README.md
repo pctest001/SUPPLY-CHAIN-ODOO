@@ -110,3 +110,4 @@ docker compose ps
 
 - **RPC 黑盒测试（40+ 用例）**：经 XML-RPC/JSON-RPC 驱动 Odoo，验证业务守卫、状态机、PRD 数值、AI、多公司、收货、产品扩展、日志追踪；含行覆盖率度量 + Mutation 反假绿门禁。跑在隔离实例（18069）。
 - **UI 自动化（Playwright 黑盒浏览器）**：真实浏览器驱动 Odoo 前端，验证页面渲染、中文化、菜单导航、字段标签、页签惰性渲染等呈现层质量。当前 4 条用例（对应 `演示走查脚本.md` 的 TC-B01 登录中文化、TC-B02 流程制造），跑在当前主实例 8069（容器内装 Chromium，宿主机代理白名单无法装浏览器）。一键运行：`.\supply-chain-odoo-tests\run_ui_tests.ps1`。
+- **L4 AI 评测 + 有效性度量**：`eval/` 包对 AI 助手做金标准评测（`eval_set.json` 14 用例）与可插拔裁判（RuleJudge / LLM-as-Judge），量化准确率 / 幻觉率 / 拒答率 / 安全违规率，并落地 §8 有效性度量（北极星逃逸率、拦截率、金标准 kappa 校准）。纯标准库、离线可跑：`python -m eval.run_eval --mode sim --fail-under 80` 与 `python -m eval.effectiveness`。详见 `supply-chain-odoo-tests/测试工程技术方案.md` §4.7 与 `supply-chain-odoo-tests/质量体系架构.md`。
