@@ -9,3 +9,8 @@ __pycache__/
 # AI 评测层：保留回归基线，忽略逐次运行报告
 eval/eval_report.json
 eval/effectiveness_report.json
+
+# L6 生产监控治理层：忽略逐次运行报告与 bad case 落盘（bad case 人工回流进 eval_set）
+prodmon/prod_report.json
+prodmon/prod_alert.json
+prodmon/bad_cases.jsonl

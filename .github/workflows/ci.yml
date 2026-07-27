@@ -131,3 +131,31 @@ jobs:
           path: |
             supply-chain-odoo-tests/eval/eval_report.json
             supply-chain-odoo-tests/eval/effectiveness_report.json
+
+  # L6 生产监控与治理：纯离线，无需 Odoo/docker，作为生产治理门禁。
+  prod-monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 生产监控门禁 (L6)
+        working-directory: supply-chain-odoo-tests
+        run: python -m prodmon.run_monitor --mode sim --fail-under 80
+
+      - name: 生产监控 pytest 断言
+        working-directory: supply-chain-odoo-tests
+        run: python -m pytest tests/test_prodmon.py -v
+
+      - name: Upload prod monitor report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-monitor-report
+          path: |
+            supply-chain-odoo-tests/prodmon/prod_report.json
+            supply-chain-odoo-tests/prodmon/prod_alert.json

@@ -27,6 +27,17 @@ AI_TOOL_WHITELIST = {
     'query_supplier_acks',
 }
 
+# ---- prompt / 模型版本化留痕（L6 生产监控与治理） ----
+# 每次会话回答都记录它"由哪版 prompt + 哪个模型"产出，使生产流量可追溯到具体版本，
+# 治理侧(prodmon/versioning.py)据此统计线上版本分布。改 prompt 时务必 +1 并在此登记。
+PROMPT_VERSION = 'v1'
+PROMPT_REGISTRY = {
+    'v1': ('你是供应链智能助手，服务于基于 Odoo 的流程制造供应链系统。'
+           '你只能通过给定的工具函数查询数据，不得擅自编造数据或执行写操作。'
+           '回答要简洁、面向业务（管理者/仓管/采购），给出可操作建议。'
+           '所有数据查询均继承用户权限，禁止越权。'),
+}
+
 
 def _safe_json(s):
     try:
@@ -91,6 +102,9 @@ class AiChatSession(models.Model):
     user_id = fields.Many2one('res.users', default=lambda self: self.env.user)
     message_ids = fields.One2many('ai.chat.message', 'session_id')
     last_reply = fields.Text()
+    # L6 版本化留痕：每次回答记录由哪版 prompt + 哪个模型产出，供 prodmon 统计线上分布
+    prompt_version = fields.Char(string='Prompt 版本', default=PROMPT_VERSION)
+    model_used = fields.Char(string='模型', default='')
 
     @api.depends('message_ids')
     def _compute_name(self):
@@ -233,10 +247,12 @@ class AiChatSession(models.Model):
         ]
 
     def _build_system_prompt(self):
-        return ('你是供应链智能助手，服务于基于 Odoo 的流程制造供应链系统。'
-                '你只能通过给定的工具函数查询数据，不得擅自编造数据或执行写操作。'
-                '回答要简洁、面向业务（管理者/仓管/采购），给出可操作建议。'
-                '所有数据查询均继承用户权限，禁止越权。')
+        # 单一真相来源：始终取当前活跃版本的注册文本
+        return PROMPT_REGISTRY.get(PROMPT_VERSION, '')
+
+    def get_prompt_template(self, version=PROMPT_VERSION):
+        """治理用：返回指定版本的 prompt 文本（供 prodmon 版本 diff / 审计）。"""
+        return PROMPT_REGISTRY.get(version, '')
 
     def _call_llm(self, cfg, messages, tools):
         key = cfg._get_api_key()
@@ -272,6 +288,8 @@ class AiChatSession(models.Model):
         cfg = self.env['ai.config'].get_active()
         if not cfg:
             return 'AI 未配置（请在「AI 配置」中启用一条配置）。'
+        # L6 版本化留痕：把"哪版 prompt + 哪个模型"写回会话，使生产流量可追溯
+        self.write({'prompt_version': PROMPT_VERSION, 'model_used': cfg.model or ''})
         messages = [
             {'role': 'system', 'content': self._build_system_prompt()},
             {'role': 'user', 'content': question},
