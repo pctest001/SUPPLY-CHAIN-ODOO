@@ -16,6 +16,9 @@ if str(_ROOT) not in sys.path:
 
 from prodmon.collector import MockCollector  # noqa: E402
 from prodmon.judge_prod import ProductionJudge  # noqa: E402
+from prodmon.hallucination_judge import (  # noqa: E402
+    HeuristicHallucinationJudge, LLMHallucinationJudge, get_hallucination_judge,
+)
 from prodmon.metrics import compute_prod_metrics, compare_to_baseline  # noqa: E402
 from prodmon.alerting import evaluate_alerts  # noqa: E402
 from prodmon.badcase import capture_bad_cases  # noqa: E402
@@ -86,6 +89,45 @@ def test_detects_hallucination():
                     tool_results=[{"lot": "香精香料-A型"}])
     r = ProductionJudge().judge(s)
     assert "hallucination" in r.flags
+
+
+def test_hallucination_judge_default_is_heuristic():
+    """无 PROD_LLM_JUDGE 时，工厂默认返回离线启发式。"""
+    j = get_hallucination_judge()
+    assert isinstance(j, HeuristicHallucinationJudge)
+
+
+def test_llm_judge_returns_llm_verdict(monkeypatch):
+    """LLM 裁判成功调用时返回 LLM 判定，并带 [LLM-Judge] 前缀。"""
+    j = LLMHallucinationJudge(api_key="fake-key")
+    monkeypatch.setattr(j, "_call", lambda q, a, r: {"hallucinated": True, "reason": "虚构数量"})
+    hal, reason = j.judge(ProdSession(
+        id="x", question="q", answer="共 99 项",
+        tool_results=[{"lot": "A"}]))
+    assert hal is True
+    assert reason.startswith("[LLM-Judge] 虚构数量")
+
+
+def test_llm_judge_neg_verdict(monkeypatch):
+    """LLM 判为非幻觉时不应打 flag。"""
+    j = LLMHallucinationJudge(api_key="fake-key")
+    monkeypatch.setattr(j, "_call", lambda q, a, r: {"hallucinated": False, "reason": "数据吻合"})
+    hal, reason = j.judge(ProdSession(
+        id="x", question="q", answer="共 12 项", tool_results=[{"n": 12}]))
+    assert hal is False
+
+
+def test_llm_judge_falls_back_on_error(monkeypatch):
+    """LLM 调用失败时降级回启发式，仍能抓到 47 幻觉且不阻断。"""
+    j = LLMHallucinationJudge(api_key="fake-key")
+    def _boom(q, a, r):
+        raise RuntimeError("network down")
+    monkeypatch.setattr(j, "_call", _boom)
+    hal, reason = j.judge(ProdSession(
+        id="x", question="查临期批次", answer="系统显示共 47 项临期批次。",
+        tool_results=[{"lot": "香精香料-A型"}]))
+    assert hal is True
+    assert "启发式" in reason
 
 
 def test_version_distribution():
@@ -209,11 +251,20 @@ def test_notify_dry_run_writes_log(tmp_path):
 if __name__ == "__main__":
     import tempfile
     from pathlib import Path as _P
+
+    class _Mono:  # 直跑时的极简 monkeypatch 替身
+        def setattr(self, obj, name, val):
+            setattr(obj, name, val)
+
     test_healthy_fixtures_all_pass()
     test_detects_safety_violation()
     test_detects_missed_refusal()
     test_detects_false_refusal()
     test_detects_hallucination()
+    test_hallucination_judge_default_is_heuristic()
+    test_llm_judge_returns_llm_verdict(_Mono())
+    test_llm_judge_neg_verdict(_Mono())
+    test_llm_judge_falls_back_on_error(_Mono())
     test_version_distribution()
     _td = _P(tempfile.mkdtemp())
     test_bad_case_capture(_td)
