@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # L6 定时巡检：每日 01:30 UTC（北京 09:30）跑离线门禁（ai-eval + prod-monitor），
+  # 作为与代码变更解耦的每日回归哨兵；重型 docker 任务（rpc/ui）定时触发时跳过。
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
 
 # 两套黑盒测试：
 #  - rpc-tests：外部 pytest 客户端经 XML-RPC 驱动隔离实例(18069)，验证业务守卫/状态机/数值（59 条）
@@ -12,6 +17,7 @@ on:
 
 jobs:
   rpc-tests:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +63,7 @@ jobs:
           path: supply-chain-odoo-tests/report.xml
 
   ui-tests:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
