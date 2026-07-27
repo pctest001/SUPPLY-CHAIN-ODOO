@@ -74,7 +74,12 @@ jobs:
         run: docker compose up -d db
 
       - name: Init DB and install modules (main instance :8069)
-        run: docker compose run --rm odoo odoo -i supply_chain_demo,sc_ai -d supplychain --stop-after-init
+        run: docker compose run --rm odoo odoo -i supply_chain_demo,sc_ai -d supplychain --load-language zh_CN --stop-after-init
+
+      # UI 用例断言中文菜单（采购/库存），需对齐手工走查环境：装 zh_CN 后
+      # 还要把 admin 的界面语言切成中文（语言存于 res_partner.lang）
+      - name: Set admin UI language to zh_CN
+        run: docker compose exec -T db psql -U odoo -d supplychain -c "UPDATE res_partner SET lang='zh_CN' WHERE id IN (SELECT partner_id FROM res_users WHERE active);"
 
       - name: Start Odoo
         run: docker compose up -d odoo
