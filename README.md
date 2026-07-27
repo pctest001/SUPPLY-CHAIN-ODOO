@@ -59,10 +59,10 @@ supply-chain-odoo/
   - **降级**：LLM 调用失败/超时，主流程不受影响，提示「AI 暂不可用」
 
 #### 配置 AI（已配置 DeepSeek）
-本仓库已预置 DeepSeek Key（`docker-compose.yml` 的 `odoo` 服务 environment 中 `SUPPLY_AI_API_KEY`，仅环境变量、不入库），并在 `sc_ai/data/ai_config.xml` 种了一条默认启用配置（provider=deepseek，model=deepseek-chat）。
-未配置 Key 时 AI 自动降级（核心供应链功能不受影响）。要换 Key/模型，改 `docker-compose.yml` 的 `SUPPLY_AI_API_KEY` 或系统「AI 配置」即可。
+本仓库的 AI Key 通过环境变量 `SUPPLY_AI_API_KEY` 注入（`docker-compose.yml` 的 `odoo` 服务 environment 中以 `${SUPPLY_AI_API_KEY}` 引用，实际值来自本地 `.env`）。`.env` 已被 `.gitignore` 忽略、**绝不入库**，因此公开仓库不含任何真实密钥；配置方法见 `.env.example`。AI 默认配置见 `sc_ai/data/ai_config.xml`（provider=deepseek，model=deepseek-chat）。
+未配置 Key 时 AI 自动降级（核心供应链功能不受影响）。要换 Key/模型，复制 `.env.example` 为 `.env` 并修改 `SUPPLY_AI_API_KEY`，或在系统「AI 配置」中调整。
 
-> ⚠️ 演示用 Key 已写入本地 `docker-compose.yml`，请勿提交到公开仓库。
+> ⚠️ 安全提示：本仓库为演示/学习用途，使用默认弱凭据（`admin@example.com / admin`、数据库 `odoo/odoo`）。部署到公网前请务必修改所有默认密码。
 
 ## 运维脚本
 
