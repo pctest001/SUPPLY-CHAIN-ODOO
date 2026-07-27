@@ -15,3 +15,8 @@ prodmon/prod_report.json
 prodmon/prod_alert.json
 prodmon/bad_cases.jsonl
 prodmon/notify.log
+
+# QA 报告聚合产物（由 python -m reports.build 生成）
+reports/dashboard.html
+reports/summary.md
+reports/metrics_history.jsonl

@@ -112,3 +112,47 @@ jobs:
         with:
           name: coverage-report
           path: supply-chain-odoo-tests/coverage_report.txt
+
+  # ---- 报告聚合：离线跑 L4 评测 + L6 监控，统一渲染 HTML 仪表盘 + Markdown 汇总 ----
+  # 入口点：Actions 运行页的 Step Summary（Markdown）+ 产物 qa-reports（dashboard.html）
+  qa-reports:
+    runs-on: ubuntu-latest
+    needs: integration
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run L4 eval (offline sim)
+        working-directory: supply-chain-odoo-tests
+        run: python -m eval.run_eval --mode sim
+
+      - name: Run L6 monitor (offline sim)
+        working-directory: supply-chain-odoo-tests
+        run: python -m prodmon.run_monitor --mode sim
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: ..
+
+      - name: Aggregate reports (dashboard + markdown)
+        working-directory: supply-chain-odoo-tests
+        run: |
+          python -m reports.build --ci >> $GITHUB_STEP_SUMMARY
+          # 把覆盖率并入汇总页（coverage gate 产物）
+          if [ -f ../supply-chain-odoo-tests/coverage_report.txt ]; then
+            { echo ""; echo "## CI 覆盖率（coverage gate, fail-under 70%）"; echo "";
+              echo '```'; tail -n 3 ../supply-chain-odoo-tests/coverage_report.txt; echo '```'; } >> reports/summary.md
+          fi
+
+      - name: Upload QA report
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-reports
+          path: |
+            supply-chain-odoo-tests/reports/dashboard.html
+            supply-chain-odoo-tests/reports/summary.md
+            supply-chain-odoo-tests/eval/eval_report.json
+            supply-chain-odoo-tests/prodmon/prod_report.json
+            supply-chain-odoo-tests/reports/metrics_history.jsonl
