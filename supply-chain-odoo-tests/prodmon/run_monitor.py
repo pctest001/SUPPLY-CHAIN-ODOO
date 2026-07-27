@@ -76,7 +76,8 @@ def _summarize(metrics: dict, alerts: list, n_bad: int, vrep: dict) -> str:
 def run(mode: str = "sim", fixtures_path: Path = DEFAULT_FIXTURES, fixtures: list | None = None,
         since_days: int = 7, sample_size: int = 0, strategy: str = "recent",
         fail_under: float = 80.0, thresholds: dict | None = None,
-        notify: bool = False, webhook: str | None = None) -> int:
+        notify: bool = False, webhook: str | None = None,
+        at_mobiles: list | None = None) -> int:
     """执行一次生产监控，返回退出码（0=通过，1=门禁失败）。
 
     fixtures: 直接传入会话列表（测试/退化场景用）；为 None 时从 fixtures_path 读取。
@@ -131,7 +132,7 @@ def run(mode: str = "sim", fixtures_path: Path = DEFAULT_FIXTURES, fixtures: lis
     # L6 闭环出口：有告警时推送 IM/值班渠道（webhook 由 --webhook 或
     # PROD_ALERT_WEBHOOK 提供；否则 dry-run 落盘 notify.log 审计）。
     if alerts:
-        notify_dispatch(report, webhook=webhook,
+        notify_dispatch(report, webhook=webhook, at_mobiles=at_mobiles,
                         dry_run=not (notify or os.getenv("PROD_ALERT_WEBHOOK")))
 
     if hard_fail:
@@ -156,13 +157,16 @@ def main():
                     help="有告警时推送 IM/值班渠道（需配 PROD_ALERT_WEBHOOK 或 --webhook；否则 dry-run 落盘 notify.log）")
     ap.add_argument("--webhook", type=str, default=None,
                     help="告警 webhook 地址（钉钉/企微/Slack 兼容）；缺省读 env PROD_ALERT_WEBHOOK")
+    ap.add_argument("--at-mobiles", dest="at_mobiles", type=str, default=None,
+                    help="逗号分隔手机号，告警时 @；缺省取 env PROD_ALERT_AT_MOBILES 或内置默认 18658159309")
     args = ap.parse_args()
     # 注意：run() 的形参顺序为 (mode, fixtures_path, fixtures, since_days, ...)，
     # 必须用关键字传参，避免 since_days(整数) 误入 fixtures 位导致 self._data 变 int。
     sys.exit(run(mode=args.mode, fixtures_path=args.fixtures,
                  since_days=args.since_days, sample_size=args.sample,
                  strategy=args.strategy, fail_under=args.fail_under,
-                 notify=args.notify, webhook=args.webhook))
+                 notify=args.notify, webhook=args.webhook,
+                 at_mobiles=(args.at_mobiles.split(",") if args.at_mobiles else None)))
 
 
 if __name__ == "__main__":
