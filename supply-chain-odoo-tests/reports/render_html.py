@@ -88,6 +88,67 @@ def _status_good(name, value):
     return True
 
 
+def _fence_section(diff_r, verdict_r) -> str:
+    """行为围栏卡片：base/head 双实例差分 + 意图裁决结果。
+
+    数据来源：fence/captures/diff_report.json + verdict_report.json。
+    任一缺失都给出可操作的提示，不崩。
+    """
+    if not diff_r and not verdict_r:
+        return ('<div class="muted">未找到围栏报告（PR 触发 CI 的 behavior-fence job，'
+                '或本地依次跑 fence.runner ×2 → fence.diff → fence.verdict）</div>')
+
+    diff_r = diff_r or {}
+    verdict_r = verdict_r or {}
+    verdict = verdict_r.get("verdict") or ("PASS" if not diff_r.get("diff_total") else "?")
+    v_ok = verdict == "PASS"
+    v_color = "#16a34a" if v_ok else "#dc2626"
+
+    total = diff_r.get("scenario_total", "?")
+    sc_diff = diff_r.get("scenario_diff", 0) or 0
+    intended = verdict_r.get("intended") or []
+    suspects = verdict_r.get("suspects") or []
+    stale = verdict_r.get("stale_intents") or []
+
+    cards = (
+        f'<div class="card"><div class="card-val" style="color:{v_color}">{_esc(verdict)}'
+        f'</div><div class="card-label">围栏裁决</div></div>'
+        + _card("场景总数", total, True, suffix="")
+        + _card("有差异场景", sc_diff, sc_diff == 0, suffix="")
+        + _card("预期变更（intents 放行）", len(intended), True, suffix="")
+        + _card("回归嫌疑", len(suspects), len(suspects) == 0, suffix="")
+    )
+
+    meta = ""
+    bm, hm = diff_r.get("base_meta") or {}, diff_r.get("head_meta") or {}
+    if bm or hm:
+        meta = (f'<div class="muted" style="margin-top:8px">base run '
+                f'<code>{_esc(bm.get("run_id","?"))}</code>（{_esc(bm.get("generated_at",""))}）'
+                f' vs head run <code>{_esc(hm.get("run_id","?"))}</code>'
+                f'（{_esc(hm.get("generated_at",""))}）</div>')
+
+    detail = ""
+    if suspects:
+        rows = ""
+        for s in suspects[:8]:
+            paths = s.get("diffs") or []
+            first = _esc((paths[0] or {}).get("path", "")) if paths else ""
+            rows += (f'<li><b>{_esc(s.get("scenario",""))}</b>'
+                     f'（{_esc(s.get("req",""))}）差异 {len(paths)} 处'
+                     f'{("，首处 <code>" + first + "</code>") if first else ""}</li>')
+        detail += (f'<div class="alert">🔴 回归嫌疑（diff − intents 后仍剩余，应当 BLOCK）：'
+                   f'<ul class="badlist">{rows}</ul></div>')
+    if stale:
+        rows = "".join(f'<li>{_esc(i.get("req",""))} · {_esc(i.get("reason",""))}</li>'
+                       for i in stale[:8])
+        detail += (f'<div class="alert">🟡 失效意图（声明了变更但未观测到，检查 intents.yml）：'
+                   f'<ul class="badlist">{rows}</ul></div>')
+    if not suspects and not stale and (diff_r or verdict_r):
+        detail = '<div class="alert ok">✅ base/head 行为一致（或全部差异均有意图背书）</div>'
+
+    return f'<div class="cards">{cards}</div>{meta}{detail}'
+
+
 def build_dashboard_html(data: dict, history: list | None = None,
                          history_path=HISTORY) -> str:
     if history is None:
@@ -164,6 +225,9 @@ def build_dashboard_html(data: dict, history: list | None = None,
                      f'refuse={sc.get("refuse")}</li>')
         bc_html += f'<ul class="badlist">{rows}</ul>'
 
+    # ---- 行为围栏（支柱一）----
+    fence_html = _fence_section(data.get("fence_diff"), data.get("fence_verdict"))
+
     regression = em.get("regression") if isinstance(em, dict) else None
     degrade_note = ""
     if prod_r.get("degraded"):
@@ -212,6 +276,11 @@ def build_dashboard_html(data: dict, history: list | None = None,
     <h2>L4 · AI 评测（研发期回归门禁）</h2>
     <div class="cards">{l4_cards or '<div class="muted">未找到 eval_report.json（先跑 python -m eval.run_eval）</div>'}</div>
     <div class="chart">{l4_trend}</div>
+  </section>
+
+  <section>
+    <h2>行为围栏 · base/head 双实例差分（变更安全 · 支柱一）</h2>
+    {fence_html}
   </section>
 
   <section>

@@ -92,15 +92,36 @@ def quasi_experiment_notes() -> dict:
     }
 
 
+def judge_mutation_metrics(path: Path = HERE / "judge_mutation_report.json") -> dict:
+    """裁判变异集结果（python -m eval.judge_mutation 产出）——
+    「裁判抓得住已知坏答案」是当前评测可信度最硬的一块证据。"""
+    if path.exists():
+        d = json.loads(path.read_text(encoding="utf-8"))
+        return {
+            "testable_samples": d.get("testable_samples"),
+            "intercept_rate": d.get("intercept_rate"),
+            "missed": len(d.get("missed") or []),
+            "false_positives": len(d.get("false_positives") or []),
+            "known_blind_spots": len(d.get("known_blind_spots") or []),
+            "verdict": d.get("verdict"),
+        }
+    return {"status": "未运行（先跑 python -m eval.judge_mutation）"}
+
+
 def main():
     mut = mutation_metrics()
     ai = ai_layer_metrics()
-    # 元评估演示：RuleJudge 与人工金标准在 eval 集上的标注一致 → kappa=1.0
-    # （eval_set.json 即人工金标准；RuleJudge 在该集上全判通过）
+    # 金标准校准：真实做法 = 人工盲标一批会话 vs 裁判判定算 kappa。
+    # 下面仍是演示桩（两组标签硬编码全 1，kappa 必为 1.0），在真实盲标数据
+    # 落地前，报告必须如实标注 source=demo-stub，绝不冒充真实校准结论。
     n_cases = ai.get("total") or 14
     rule_labels = [1] * n_cases
     human_labels = [1] * n_cases
     calib = calibrate(rule_labels, human_labels)
+    calib["source"] = "demo-stub"
+    calib["caveat"] = ("演示桩：标签硬编码，非真实人工盲标。落地需抽 30-50 条真实"
+                      "会话人工盲标后替换本段，方可作为可信度证据")
+    jm = judge_mutation_metrics()
     quasi = quasi_experiment_notes()
 
     report = {
@@ -114,10 +135,12 @@ def main():
             "accuracy": ai.get("accuracy"),
         },
         "meta_evaluation": {
+            "judge_mutation": jm,
             "gold_standard_calibration": calib,
             "quasi_experiment": quasi,
         },
-        "verdict": "PASS" if (mut["escape_rate"] == 0 and ai.get("quality_score", 0) >= 80) else "REVIEW",
+        "verdict": "PASS" if (mut["escape_rate"] == 0 and ai.get("quality_score", 0) >= 80
+                              and jm.get("verdict") in ("PASS", None)) else "REVIEW",
     }
     REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -126,7 +149,11 @@ def main():
     print(f"误报率 false_positive_rate   : {mut['false_positive_rate']}%")
     print(f"AI 层 quality_score          : {ai.get('quality_score')}")
     print(f"AI 层 幻觉率                 : {ai.get('hallucination_rate')}%")
-    print(f"金标准校准 cohen_kappa       : {calib['cohen_kappa']} ({calib['agreement_band']})")
+    print(f"裁判变异集                   : "
+          f"{jm.get('verdict', jm.get('status'))} "
+          f"(拦截 {jm.get('intercept_rate', '-')}% / 盲区 {jm.get('known_blind_spots', '-')})")
+    print(f"金标准校准 cohen_kappa       : {calib['cohen_kappa']} "
+          f"({calib['agreement_band']}) [警告: {calib['source']}，非真实校准]")
     print(f"准实验对比                   : {quasi['status']}")
     print(f"\n判定 verdict                 : {report['verdict']}")
     print(f"已写出: {REPORT.name}")

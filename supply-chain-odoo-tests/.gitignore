@@ -9,6 +9,7 @@ __pycache__/
 # AI 评测层：保留回归基线，忽略逐次运行报告
 eval/eval_report.json
 eval/effectiveness_report.json
+eval/judge_mutation_report.json
 
 # L6 生产监控治理层：忽略逐次运行报告与 bad case 落盘（bad case 人工回流进 eval_set）
 prodmon/prod_report.json
@@ -20,3 +21,10 @@ prodmon/notify.log
 reports/dashboard.html
 reports/summary.md
 reports/metrics_history.jsonl
+
+# 行为围栏运行产物（raw capture 逐次生成，不入库；diff_report 由 P1 生成）
+fence/captures/
+logs/odoo-base/
+
+# 考古工具箱产物（视图逆向候选清单，人审后经 kb.store add 登记，不入库）
+kb/candidates_views.json

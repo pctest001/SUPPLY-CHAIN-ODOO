@@ -1,0 +1,37 @@
+# 行为围栏·意图清单（支柱一 P2）
+#
+# 语义：本次变更（当前分支/PR）【预期会引起】的行为差异，逐条声明。
+#   verdict.py 会用它扣除 diff_report 中的差异：diff − intents = 回归嫌疑。
+#   回归嫌疑不为零 -> CI behavior-fence job 失败，禁止合并。
+#
+# 铁律：
+#   1. 每条意图必须挂 req（REQ-xxx 需求条目号）——放行必须留痕，可审计（支柱三）。
+#   2. 每条意图必须写 reason（一句话说明为什么行为该变）。
+#   3. 意图清单随 PR 提交、随 PR 评审——评审者看到的不只是代码 diff，
+#      还有作者【自己声明的行为变更清单】，两者对不上就该追问。
+#   4. 未被任何差异消费的意图（stale intent）会被告警：声明了要变却没变，
+#      说明改动没生效或意图写错，同样值得追问。
+#   5. 合并后本文件应清空回 intents: []（意图只对当次变更有效，严禁长期积累
+#      成"万能放行清单"）。
+#
+# 字段说明：
+#   req:       必填，需求条目号（REQ-xxx）
+#   reason:    必填，一句话理由
+#   scenarios: 必填，场景 id 列表；["*"] 表示全部场景（慎用）
+#   paths:     可选，差异路径 glob 列表（如 observations.guard_msg、observations.*）；
+#              省略 = 该场景下所有差异均为预期。新增/删除场景用 verdict 值
+#              head_only / base_only 作为路径匹配（见示例）。
+#
+# 示例（保持注释状态，需要时复制出来改）：
+# intents:
+#   - req: REQ-C2-GUARD-ZERO
+#     reason: "PRD v3.2 调整零金额守卫文案，从『金额为 0』改为『金额必须大于零』"
+#     scenarios: [s_po_guard_submit_zero]
+#     paths: ["observations.guard_msg"]
+#   - req: REQ-D5-NEW-FLOW
+#     reason: "本 PR 新增 D5 退货流程及配套围栏场景"
+#     scenarios: [s_return_flow, s_return_guard_qty]
+#     paths: ["head_only"]
+
+version: 1
+intents: []

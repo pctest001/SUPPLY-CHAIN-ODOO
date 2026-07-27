@@ -15,6 +15,8 @@ EVAL_REPORT = ROOT / "eval" / "eval_report.json"
 PROD_REPORT = ROOT / "prodmon" / "prod_report.json"
 PROD_ALERT = ROOT / "prodmon" / "prod_alert.json"
 BADCASES = ROOT / "prodmon" / "bad_cases.jsonl"
+FENCE_DIFF = ROOT / "fence" / "captures" / "diff_report.json"
+FENCE_VERDICT = ROOT / "fence" / "captures" / "verdict_report.json"
 
 HISTORY = HERE / "metrics_history.jsonl"
 DASHBOARD = HERE / "dashboard.html"
@@ -47,7 +49,8 @@ def _read_jsonl(path: Path) -> list:
 
 
 def load_all() -> dict:
-    """返回 {eval_report, prod_report, alert, bad_cases, bad_cases_count}。"""
+    """返回 {eval_report, prod_report, alert, bad_cases, bad_cases_count,
+    fence_diff, fence_verdict}。"""
     alert = _read_json(PROD_ALERT) or {}
     bad_cases = _read_jsonl(BADCASES)
     return {
@@ -58,4 +61,7 @@ def load_all() -> dict:
         "alert_level": alert.get("level", "ok"),
         "bad_cases": bad_cases,
         "bad_cases_count": len(bad_cases),
+        # 支柱一 · 行为围栏（缺失返回 None，仪表盘显示「未运行」）
+        "fence_diff": _read_json(FENCE_DIFF),
+        "fence_verdict": _read_json(FENCE_VERDICT),
     }

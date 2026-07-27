@@ -63,6 +63,30 @@ def build_markdown(data: dict, history: list | None = None) -> str:
     else:
         parts.append("_未找到 eval_report.json（先跑 `python -m eval.run_eval --mode sim`）_")
 
+    # ---- 行为围栏（支柱一）----
+    parts.append("\n## 行为围栏 · base/head 双实例差分（变更安全 · 支柱一）")
+    fd = data.get("fence_diff") or {}
+    fv = data.get("fence_verdict") or {}
+    if fd or fv:
+        verdict = fv.get("verdict") or ("PASS" if not fd.get("diff_total") else "?")
+        icon = "✅" if verdict == "PASS" else "❌"
+        suspects = fv.get("suspects") or []
+        stale = fv.get("stale_intents") or []
+        parts.append(
+            f"判定：**{icon} {verdict}** ｜ 场景 {fd.get('scenario_total','?')} "
+            f"｜ 有差异 {fd.get('scenario_diff', 0)} "
+            f"｜ 意图放行 {len(fv.get('intended') or [])} "
+            f"｜ 回归嫌疑 {len(suspects)}")
+        for s in suspects[:8]:
+            parts.append(f"- 🔴 `{s.get('scenario','')}`（{s.get('req','')}）"
+                         f"差异 {len(s.get('diffs') or [])} 处")
+        for i in stale[:8]:
+            parts.append(f"- 🟡 失效意图 `{i.get('req','')}`：{i.get('reason','')}"
+                         "（声明了变更但未观测到，检查 intents.yml）")
+    else:
+        parts.append("_未找到围栏报告（PR 触发 behavior-fence job，或本地跑 "
+                     "`fence.runner`×2 → `fence.diff` → `fence.verdict`）_")
+
     # ---- L6 ----
     parts.append("\n## L6 · 生产监控（治理）")
     if pm:

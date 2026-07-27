@@ -1,0 +1,65 @@
+# 行为围栏 base 实例（支柱一·双版本对照的「变更前」端）。
+#
+# 与 docker-compose.test.yml（head，18069/5433）完全同构，仅三处不同：
+#   - 端口：28069 / 5434（避开 head）
+#   - 卷：base_db_data / base_odoo_data（数据完全隔离）
+#   - addons 路径：由 FENCE_BASE_ADDONS 指定（默认 ../custom_addons，即与 head 同代码，
+#     用于 P1「同版本自比对必须零 diff」验收；CI 中应 checkout base commit 到独立
+#     worktree 后 FENCE_BASE_ADDONS 指过去）。
+#
+# 启动（必须用 -p 指定独立 project，避免与 head 的 compose project 混淆）：
+#   docker compose -f docker-compose.base.yml -p fence-base run --rm odoo \
+#     odoo -i supply_chain_demo,sc_ai -d test_supplychain --stop-after-init
+#   docker compose -f docker-compose.base.yml -p fence-base up -d odoo
+# 停止：
+#   docker compose -f docker-compose.base.yml -p fence-base down
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: odoo
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    ports:
+      - "5434:5432"
+    volumes:
+      - base_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  odoo:
+    image: odoo:18.0
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "28069:8069"
+    environment:
+      - HOST=db
+      - PORT=5432
+      - USER=odoo
+      - PASSWORD=odoo
+      - DB_NAME=test_supplychain
+      - SUPPLY_AI_API_KEY=${SUPPLY_AI_API_KEY:-}
+    volumes:
+      - ${FENCE_BASE_ADDONS:-../custom_addons}:/mnt/extra-addons
+      - base_odoo_data:/var/lib/odoo
+      - ./logs/odoo-base:/var/log/odoo
+    command:
+      - odoo
+      - --db_host=db
+      - --db_port=5432
+      - --db_user=odoo
+      - --db_password=odoo
+      - --db-filter=^test_supplychain$
+      - --logfile=/var/log/odoo/odoo.log
+    restart: unless-stopped
+
+volumes:
+  base_db_data:
+  base_odoo_data:

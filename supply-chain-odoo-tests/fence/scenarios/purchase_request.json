@@ -1,0 +1,116 @@
+[
+  {
+    "id": "s_pr_submit_flow",
+    "title": "PR 提交正向流：draft -> submit 后状态",
+    "req": "REQ-PR-SUBMIT",
+    "steps": [
+      {"op": "create", "model": "sc.purchase.request", "save_as": "pr", "vals": {
+        "name": "$uniq:FPR_SUB", "company_id": "$ctx.company_id", "warehouse_id": "$ctx.warehouse_id",
+        "partner_id": "$ctx.supplier_id",
+        "line_ids": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_uom_qty": 1.0}]]}},
+      {"op": "action", "model": "sc.purchase.request", "method": "action_submit", "ids": ["$ref.pr"]},
+      {"op": "observe_records", "name": "after_submit", "model": "sc.purchase.request", "ids": ["$ref.pr"], "fields": ["state"]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "sc.purchase.request", "ids": ["$ref.pr"]}
+    ]
+  },
+  {
+    "id": "s_pr_generate_po",
+    "title": "PR 生成 PO：submit -> generate_po，PO 关联与条数",
+    "req": "REQ-PR-GENPO",
+    "steps": [
+      {"op": "create", "model": "sc.purchase.request", "save_as": "pr", "vals": {
+        "name": "$uniq:FPR_GEN", "company_id": "$ctx.company_id", "warehouse_id": "$ctx.warehouse_id",
+        "partner_id": "$ctx.supplier_id",
+        "line_ids": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_uom_qty": 2.0}]]}},
+      {"op": "action", "model": "sc.purchase.request", "method": "action_submit", "ids": ["$ref.pr"]},
+      {"op": "action", "model": "sc.purchase.request", "method": "action_generate_po", "ids": ["$ref.pr"]},
+      {"op": "observe_records", "name": "pr_after_genpo", "model": "sc.purchase.request", "ids": ["$ref.pr"], "fields": ["state"]},
+      {"op": "read_field", "model": "sc.purchase.request", "id": "$ref.pr", "field": "po_ids", "save_as": "pos"},
+      {"op": "observe_count", "name": "po_count", "model": "purchase.order", "domain": [["id", "in", "$ref.pos"]]},
+      {"op": "observe_records", "name": "po_lines", "model": "purchase.order.line", "domain": [["order_id", "in", "$ref.pos"]], "fields": ["product_qty", "price_unit"]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "sc.purchase.request", "ids": ["$ref.pr"]}
+    ]
+  },
+  {
+    "id": "s_pr_guard_genpo_nopartner",
+    "title": "[Unwanted] 无供应商 generate_po：守卫报错文本",
+    "req": "REQ-PR-GUARD-NOPARTNER",
+    "steps": [
+      {"op": "create", "model": "sc.purchase.request", "save_as": "pr", "vals": {
+        "name": "$uniq:FPR_NOP", "company_id": "$ctx.company_id", "warehouse_id": "$ctx.warehouse_id",
+        "line_ids": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_uom_qty": 1.0}]]}},
+      {"op": "action", "model": "sc.purchase.request", "method": "action_submit", "ids": ["$ref.pr"]},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "sc.purchase.request", "method": "action_generate_po", "ids": ["$ref.pr"]}}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "sc.purchase.request", "ids": ["$ref.pr"]}
+    ]
+  },
+  {
+    "id": "s_pr_guard_submit_noline",
+    "title": "[Unwanted] 无明细 submit：守卫报错文本",
+    "req": "REQ-PR-GUARD-NOLINE",
+    "steps": [
+      {"op": "create", "model": "sc.purchase.request", "save_as": "pr", "vals": {
+        "name": "$uniq:FPR_NOL", "company_id": "$ctx.company_id", "warehouse_id": "$ctx.warehouse_id",
+        "partner_id": "$ctx.supplier_id", "line_ids": []}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "sc.purchase.request", "method": "action_submit", "ids": ["$ref.pr"]}}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "sc.purchase.request", "ids": ["$ref.pr"]}
+    ]
+  },
+  {
+    "id": "s_pr_cancel",
+    "title": "PR 取消：action_cancel 后状态",
+    "req": "REQ-PR-CANCEL",
+    "steps": [
+      {"op": "create", "model": "sc.purchase.request", "save_as": "pr", "vals": {
+        "name": "$uniq:FPR_CAN", "company_id": "$ctx.company_id", "warehouse_id": "$ctx.warehouse_id",
+        "partner_id": "$ctx.supplier_id",
+        "line_ids": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_uom_qty": 1.0}]]}},
+      {"op": "action", "model": "sc.purchase.request", "method": "action_cancel", "ids": ["$ref.pr"]},
+      {"op": "observe_records", "name": "after_cancel", "model": "sc.purchase.request", "ids": ["$ref.pr"], "fields": ["state"]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "sc.purchase.request", "ids": ["$ref.pr"]}
+    ]
+  },
+  {
+    "id": "s_pr_reset",
+    "title": "PR 重置：submit 后 reset 回 draft",
+    "req": "REQ-PR-RESET",
+    "steps": [
+      {"op": "create", "model": "sc.purchase.request", "save_as": "pr", "vals": {
+        "name": "$uniq:FPR_RST", "company_id": "$ctx.company_id", "warehouse_id": "$ctx.warehouse_id",
+        "partner_id": "$ctx.supplier_id",
+        "line_ids": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_uom_qty": 1.0}]]}},
+      {"op": "action", "model": "sc.purchase.request", "method": "action_submit", "ids": ["$ref.pr"]},
+      {"op": "action", "model": "sc.purchase.request", "method": "action_reset", "ids": ["$ref.pr"]},
+      {"op": "observe_records", "name": "after_reset", "model": "sc.purchase.request", "ids": ["$ref.pr"], "fields": ["state"]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "sc.purchase.request", "ids": ["$ref.pr"]}
+    ]
+  },
+  {
+    "id": "s_pr_view_pos_action",
+    "title": "PR action_view_pos：关联 PO 时返回 act_window 结构",
+    "req": "REQ-PR-VIEWPOS",
+    "steps": [
+      {"op": "create", "model": "sc.purchase.request", "save_as": "pr", "vals": {
+        "name": "$uniq:FPR_VP", "company_id": "$ctx.company_id", "warehouse_id": "$ctx.warehouse_id",
+        "partner_id": "$ctx.supplier_id",
+        "line_ids": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_uom_qty": 1.0}]]}},
+      {"op": "write", "model": "sc.purchase.request", "ids": ["$ref.pr"], "vals": {"po_ids": [[4, "$ctx.po_id"]]}},
+      {"op": "observe_action", "name": "view_pos_action", "model": "sc.purchase.request", "method": "action_view_pos", "ids": ["$ref.pr"]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "sc.purchase.request", "ids": ["$ref.pr"]}
+    ]
+  }
+]

@@ -1,0 +1,89 @@
+[
+  {
+    "id": "s_rcpt_nolot_guard",
+    "title": "C3 流程制造收货未录批次：守卫报错文本",
+    "req": "REQ-C3-LOT",
+    "steps": [
+      {"op": "make_proc_product", "save_as": "p", "name": "$uniq:FP_NOLOT"},
+      {"op": "make_picking", "save_as": "pk", "direction": "in", "product": "$ref.p.product", "uom": "$ref.p.uom", "qty": 5},
+      {"op": "force_line", "picking": "$ref.pk.picking", "move": "$ref.pk.move", "vals": {"quantity": 5, "lot_id": false, "lot_name": false, "expiration_date": false}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "stock.picking", "method": "button_validate", "ids": ["$ref.pk.picking"]}}
+    ]
+  },
+  {
+    "id": "s_rcpt_noexp_guard",
+    "title": "C3 录批次未录效期：守卫报错文本",
+    "req": "REQ-C3-EXP",
+    "steps": [
+      {"op": "make_proc_product", "save_as": "p", "name": "$uniq:FP_NOEXP"},
+      {"op": "make_picking", "save_as": "pk", "direction": "in", "product": "$ref.p.product", "uom": "$ref.p.uom", "qty": 5},
+      {"op": "force_line", "picking": "$ref.pk.picking", "move": "$ref.pk.move", "vals": {"quantity": 5, "lot_name": "$uniq:LOT_NOEXP", "expiration_date": false}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "stock.picking", "method": "button_validate", "ids": ["$ref.pk.picking"]}}
+    ]
+  },
+  {
+    "id": "s_rcpt_ok_traceable",
+    "title": "C3 正向收货：批次+效期齐全，lot 落库、在库量入账",
+    "req": "REQ-C3-TRACE",
+    "steps": [
+      {"op": "make_proc_product", "save_as": "p", "name": "$uniq:FP_OK"},
+      {"op": "receive", "save_as": "rc", "product": "$ref.p.product", "uom": "$ref.p.uom", "qty": 5, "lot_name": "$uniq:LOT_OK", "exp": "$date:180"},
+      {"op": "observe_records", "name": "lot", "model": "stock.lot", "ids": ["$ref.rc.lot"], "fields": ["name", "expiration_date"]},
+      {"op": "observe_sum", "name": "onhand_qty", "model": "stock.quant", "field": "quantity", "domain": [["product_id", "=", "$ref.p.product"], ["location_id", "=", "$ctx.stock_loc"], ["lot_id", "=", "$ref.rc.lot"]]}
+    ]
+  },
+  {
+    "id": "s_rcpt_over_po_guard",
+    "title": "D4 PO 订 5 收 8 超额收货：守卫报错文本",
+    "req": "REQ-D4-OVERRECEIPT",
+    "steps": [
+      {"op": "make_plain_product", "save_as": "p", "name": "$uniq:FP_OVER"},
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ref.p.product", "product_qty": 5, "price_unit": 10}]]}},
+      {"op": "action", "model": "purchase.order", "method": "action_submit_for_approval", "ids": ["$ref.po"]},
+      {"op": "action", "model": "purchase.order", "method": "action_approve", "ids": ["$ref.po"]},
+      {"op": "action", "model": "purchase.order", "method": "button_confirm", "ids": ["$ref.po"]},
+      {"op": "observe_records", "name": "po_state", "model": "purchase.order", "ids": ["$ref.po"], "fields": ["state"]},
+      {"op": "read_field", "model": "purchase.order", "id": "$ref.po", "field": "picking_ids", "save_as": "picks"},
+      {"op": "search", "model": "stock.move", "domain": [["picking_id", "=", "$ref.picks.0"]], "limit": 1, "first": true, "save_as": "move"},
+      {"op": "force_line", "picking": "$ref.picks.0", "move": "$ref.move", "vals": {"quantity": 8}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "stock.picking", "method": "button_validate", "ids": ["$ref.picks.0"]}}
+    ]
+  },
+  {
+    "id": "s_out_nolot_guard",
+    "title": "D1 出库不指定批次：守卫报错文本",
+    "req": "REQ-D1-OUTLOT",
+    "steps": [
+      {"op": "make_proc_product", "save_as": "p", "name": "$uniq:FP_OUTNL"},
+      {"op": "receive", "save_as": "rc", "product": "$ref.p.product", "uom": "$ref.p.uom", "qty": 5, "lot_name": "$uniq:LOT_OUTNL", "exp": "$date:180"},
+      {"op": "make_picking", "save_as": "pk", "direction": "out", "product": "$ref.p.product", "uom": "$ref.p.uom", "qty": 3},
+      {"op": "force_line", "picking": "$ref.pk.picking", "move": "$ref.pk.move", "vals": {"quantity": 3, "lot_id": false, "lot_name": false}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "stock.picking", "method": "button_validate", "ids": ["$ref.pk.picking"]}}
+    ]
+  },
+  {
+    "id": "s_out_expired_guard",
+    "title": "D3 过期批次出库：守卫报错文本",
+    "req": "REQ-D3-EXPIRED",
+    "steps": [
+      {"op": "make_proc_product", "save_as": "p", "name": "$uniq:FP_EXPD"},
+      {"op": "receive", "save_as": "rc", "product": "$ref.p.product", "uom": "$ref.p.uom", "qty": 5, "lot_name": "$uniq:LOT_EXPD", "exp": "$date:-10"},
+      {"op": "make_picking", "save_as": "pk", "direction": "out", "product": "$ref.p.product", "uom": "$ref.p.uom", "qty": 2},
+      {"op": "force_line", "picking": "$ref.pk.picking", "move": "$ref.pk.move", "vals": {"quantity": 2, "lot_id": "$ref.rc.lot"}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "stock.picking", "method": "button_validate", "ids": ["$ref.pk.picking"]}}
+    ]
+  },
+  {
+    "id": "s_out_negative_guard",
+    "title": "D4 零库存出 5（负库存）：守卫报错文本",
+    "req": "REQ-D4-NEGSTOCK",
+    "steps": [
+      {"op": "make_plain_product", "save_as": "p", "name": "$uniq:FP_NEG"},
+      {"op": "make_picking", "save_as": "pk", "direction": "out", "product": "$ref.p.product", "uom": "$ref.p.uom", "qty": 5},
+      {"op": "force_line", "picking": "$ref.pk.picking", "move": "$ref.pk.move", "vals": {"quantity": 5}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "stock.picking", "method": "button_validate", "ids": ["$ref.pk.picking"]}}
+    ]
+  }
+]

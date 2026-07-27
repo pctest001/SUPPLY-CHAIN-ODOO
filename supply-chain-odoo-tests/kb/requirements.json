@@ -1,0 +1,396 @@
+{
+  "version": 1,
+  "requirements": [
+    {
+      "id": "REQ-C2-APPROVAL",
+      "title": "C2 采购审批正向流",
+      "statement": "C2 采购审批正向流：submit -> approve，捕获各阶段状态",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_approve_flow"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C2-CONFIRM",
+      "title": "C2->D4 审批通过后 button_confirm",
+      "statement": "C2->D4 审批通过后 button_confirm：PO 进入 purchase 并生成收货",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_confirm_after_approve"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C2-GUARD-APPROVE",
+      "title": "[Unwanted] draft 直接 approve",
+      "statement": "[Unwanted] draft 直接 approve：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_guard_approve_draft"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C2-GUARD-CONFIRM",
+      "title": "[Unwanted] 未审批 button_confirm",
+      "statement": "[Unwanted] 未审批 button_confirm：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_guard_confirm_unapproved"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C2-GUARD-NOLINE",
+      "title": "[Unwanted] 无明细提交审批",
+      "statement": "[Unwanted] 无明细提交审批：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_guard_submit_noline"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C2-GUARD-REJECT",
+      "title": "[Unwanted] draft 直接 reject",
+      "statement": "[Unwanted] draft 直接 reject：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_guard_reject_draft"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C2-GUARD-ZERO",
+      "title": "[Unwanted] 金额为 0 提交审批",
+      "statement": "[Unwanted] 金额为 0 提交审批：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_guard_submit_zero"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C2-REJECT",
+      "title": "C2 审批拒绝",
+      "statement": "C2 审批拒绝：pending PO 被 reject 后状态",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_reject"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C2-RESET",
+      "title": "C2 审批重置",
+      "statement": "C2 审批重置：approved PO reset 回 draft",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_po_reset"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C3-EXP",
+      "title": "C3 录批次未录效期",
+      "statement": "C3 录批次未录效期：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_rcpt_noexp_guard"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C3-LOT",
+      "title": "C3 流程制造收货未录批次",
+      "statement": "C3 流程制造收货未录批次：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_rcpt_nolot_guard"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-C3-TRACE",
+      "title": "C3 正向收货",
+      "statement": "C3 正向收货：批次+效期齐全，lot 落库、在库量入账",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_rcpt_ok_traceable"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-D1-OUTLOT",
+      "title": "D1 出库不指定批次",
+      "statement": "D1 出库不指定批次：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_out_nolot_guard"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-D3-EXPIRED",
+      "title": "D3 过期批次出库",
+      "statement": "D3 过期批次出库：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_out_expired_guard"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-D4-NEGSTOCK",
+      "title": "D4 零库存出 5（负库存）",
+      "statement": "D4 零库存出 5（负库存）：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_out_negative_guard"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-D4-OVERRECEIPT",
+      "title": "D4 PO 订 5 收 8 超额收货",
+      "statement": "D4 PO 订 5 收 8 超额收货：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_rcpt_over_po_guard"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-PR-CANCEL",
+      "title": "PR 取消",
+      "statement": "PR 取消：action_cancel 后状态",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_pr_cancel"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-PR-GENPO",
+      "title": "PR 生成 PO",
+      "statement": "PR 生成 PO：submit -> generate_po，PO 关联与条数",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_pr_generate_po"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-PR-GUARD-NOLINE",
+      "title": "[Unwanted] 无明细 submit",
+      "statement": "[Unwanted] 无明细 submit：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_pr_guard_submit_noline"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-PR-GUARD-NOPARTNER",
+      "title": "[Unwanted] 无供应商 generate_po",
+      "statement": "[Unwanted] 无供应商 generate_po：守卫报错文本",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_pr_guard_genpo_nopartner"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-PR-RESET",
+      "title": "PR 重置",
+      "statement": "PR 重置：submit 后 reset 回 draft",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_pr_reset"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-PR-SUBMIT",
+      "title": "PR 提交正向流",
+      "statement": "PR 提交正向流：draft -> submit 后状态",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_pr_submit_flow"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    },
+    {
+      "id": "REQ-PR-VIEWPOS",
+      "title": "PR action_view_pos",
+      "statement": "PR action_view_pos：关联 PO 时返回 act_window 结构",
+      "provenance": "current-prd",
+      "status": "active",
+      "confidence": 1.0,
+      "links": {
+        "prd": "验收清单.md",
+        "scenarios": [
+          "s_pr_view_pos_action"
+        ]
+      },
+      "notes": "由围栏场景库播种（P3），语句待用 PRD 原文精化",
+      "created_at": "2026-07-27 22:35:05",
+      "updated_at": "2026-07-27 22:35:05"
+    }
+  ]
+}

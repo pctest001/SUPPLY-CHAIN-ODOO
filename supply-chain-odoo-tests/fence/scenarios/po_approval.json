@@ -1,0 +1,139 @@
+[
+  {
+    "id": "s_po_approve_flow",
+    "title": "C2 采购审批正向流：submit -> approve，捕获各阶段状态",
+    "req": "REQ-C2-APPROVAL",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_qty": 1.0, "price_unit": 10.0}]]}},
+      {"op": "action", "model": "purchase.order", "method": "action_submit_for_approval", "ids": ["$ref.po"]},
+      {"op": "observe_records", "name": "after_submit", "model": "purchase.order", "ids": ["$ref.po"], "fields": ["approval_state", "state"]},
+      {"op": "action", "model": "purchase.order", "method": "action_approve", "ids": ["$ref.po"]},
+      {"op": "observe_records", "name": "after_approve", "model": "purchase.order", "ids": ["$ref.po"], "fields": ["approval_state", "state"]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  },
+  {
+    "id": "s_po_confirm_after_approve",
+    "title": "C2->D4 审批通过后 button_confirm：PO 进入 purchase 并生成收货",
+    "req": "REQ-C2-CONFIRM",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_qty": 2.0, "price_unit": 10.0}]]}},
+      {"op": "action", "model": "purchase.order", "method": "action_submit_for_approval", "ids": ["$ref.po"]},
+      {"op": "action", "model": "purchase.order", "method": "action_approve", "ids": ["$ref.po"]},
+      {"op": "action", "model": "purchase.order", "method": "button_confirm", "ids": ["$ref.po"]},
+      {"op": "observe_records", "name": "po_after_confirm", "model": "purchase.order", "ids": ["$ref.po"], "fields": ["state", "approval_state", "amount_total"]},
+      {"op": "read_field", "model": "purchase.order", "id": "$ref.po", "field": "picking_ids", "save_as": "picks"},
+      {"op": "observe_count", "name": "picking_count", "model": "stock.picking", "domain": [["id", "in", "$ref.picks"]]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  },
+  {
+    "id": "s_po_reject",
+    "title": "C2 审批拒绝：pending PO 被 reject 后状态",
+    "req": "REQ-C2-REJECT",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_qty": 1.0, "price_unit": 10.0}]]}},
+      {"op": "action", "model": "purchase.order", "method": "action_submit_for_approval", "ids": ["$ref.po"]},
+      {"op": "action", "model": "purchase.order", "method": "action_reject", "ids": ["$ref.po"]},
+      {"op": "observe_records", "name": "after_reject", "model": "purchase.order", "ids": ["$ref.po"], "fields": ["approval_state", "state"]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  },
+  {
+    "id": "s_po_reset",
+    "title": "C2 审批重置：approved PO reset 回 draft",
+    "req": "REQ-C2-RESET",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_qty": 1.0, "price_unit": 10.0}]]}},
+      {"op": "action", "model": "purchase.order", "method": "action_submit_for_approval", "ids": ["$ref.po"]},
+      {"op": "action", "model": "purchase.order", "method": "action_approve", "ids": ["$ref.po"]},
+      {"op": "action", "model": "purchase.order", "method": "action_reset_approval", "ids": ["$ref.po"]},
+      {"op": "observe_records", "name": "after_reset", "model": "purchase.order", "ids": ["$ref.po"], "fields": ["approval_state", "state"]}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  },
+  {
+    "id": "s_po_guard_approve_draft",
+    "title": "[Unwanted] draft 直接 approve：守卫报错文本",
+    "req": "REQ-C2-GUARD-APPROVE",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_qty": 1.0, "price_unit": 10.0}]]}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "purchase.order", "method": "action_approve", "ids": ["$ref.po"]}}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  },
+  {
+    "id": "s_po_guard_reject_draft",
+    "title": "[Unwanted] draft 直接 reject：守卫报错文本",
+    "req": "REQ-C2-GUARD-REJECT",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_qty": 1.0, "price_unit": 10.0}]]}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "purchase.order", "method": "action_reject", "ids": ["$ref.po"]}}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  },
+  {
+    "id": "s_po_guard_submit_noline",
+    "title": "[Unwanted] 无明细提交审批：守卫报错文本",
+    "req": "REQ-C2-GUARD-NOLINE",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {"partner_id": "$ctx.supplier_id", "order_line": []}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "purchase.order", "method": "action_submit_for_approval", "ids": ["$ref.po"]}}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  },
+  {
+    "id": "s_po_guard_submit_zero",
+    "title": "[Unwanted] 金额为 0 提交审批：守卫报错文本",
+    "req": "REQ-C2-GUARD-ZERO",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_qty": 1.0, "price_unit": 0.0}]]}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "purchase.order", "method": "action_submit_for_approval", "ids": ["$ref.po"]}}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  },
+  {
+    "id": "s_po_guard_confirm_unapproved",
+    "title": "[Unwanted] 未审批 button_confirm：守卫报错文本",
+    "req": "REQ-C2-GUARD-CONFIRM",
+    "steps": [
+      {"op": "create", "model": "purchase.order", "save_as": "po", "vals": {
+        "partner_id": "$ctx.supplier_id",
+        "order_line": [[0, 0, {"product_id": "$ctx.ingredient_id", "product_uom": "$ctx.ingredient_uom_id", "product_qty": 1.0, "price_unit": 10.0}]]}},
+      {"op": "observe_fault", "name": "guard_msg", "action": {"model": "purchase.order", "method": "button_confirm", "ids": ["$ref.po"]}}
+    ],
+    "cleanup": [
+      {"op": "unlink", "model": "purchase.order", "ids": ["$ref.po"]}
+    ]
+  }
+]

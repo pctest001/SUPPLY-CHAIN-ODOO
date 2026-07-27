@@ -126,6 +126,13 @@ jobs:
         working-directory: supply-chain-odoo-tests
         run: python -m pytest tests/test_eval.py -v
 
+      # 评测可信度第 3 层（mutation of judge）：对裁判本身做变异——坏样本必须被抓、
+      # 好样本不得误杀、盲区如实呈现。judge_mutation 失败（exit 1）即熔断本 job，
+      # 阻止「失灵的裁判 + 仍绿的报告」同时过关。纯离线秒级，无 Odoo/docker。
+      - name: 裁判变异集 (评测可信度第3层)
+        working-directory: supply-chain-odoo-tests
+        run: python -m eval.judge_mutation
+
       - name: 体系有效性度量 (§8)
         working-directory: supply-chain-odoo-tests
         run: python -m eval.effectiveness
@@ -138,6 +145,101 @@ jobs:
           path: |
             supply-chain-odoo-tests/eval/eval_report.json
             supply-chain-odoo-tests/eval/effectiveness_report.json
+            supply-chain-odoo-tests/eval/judge_mutation_report.json
+
+  # 支柱三·增量止血：PR 必须引用 KB 已登记的 REQ-xxx；intents.yml 的 req 必须真实存在。
+  # 轻量纯离线（秒级），放最前面快速反馈。PR 文本经环境变量传入（防 shell 注入）。
+  req-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: python -m pip install --upgrade pip pyyaml
+
+      - name: KB 自校验
+        working-directory: supply-chain-odoo-tests
+        run: python -m kb.store validate
+
+      - name: REQ 关联门禁（PR 标题+描述 / intents）
+        working-directory: supply-chain-odoo-tests
+        env:
+          PR_TEXT: "${{ github.event.pull_request.title }} ${{ github.event.pull_request.body }}"
+        run: python -m kb.gate --text-env PR_TEXT --intents fence/intents.yml
+
+  # 支柱一·行为围栏：base(PR目标分支代码) vs head(本PR代码) 双实例跑同一场景库，
+  # diff − intents.yml = 回归嫌疑；嫌疑不为零禁止合并（verdict exit 1）。
+  # 仅 PR 触发：围栏语义是"本次变更前后对比"，push/schedule 无 base 可比。
+  behavior-fence:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # base 版本代码单独 checkout，供 base 实例挂载
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base-src
+
+      - name: Start head instance (:18069)
+        working-directory: supply-chain-odoo-tests
+        run: |
+          docker compose -f docker-compose.test.yml up -d db
+          docker compose -f docker-compose.test.yml run --rm odoo odoo -i supply_chain_demo,sc_ai -d test_supplychain --stop-after-init
+          docker compose -f docker-compose.test.yml up -d odoo
+
+      - name: Start base instance (:28069, addons=base ref)
+        working-directory: supply-chain-odoo-tests
+        env:
+          FENCE_BASE_ADDONS: ${{ github.workspace }}/base-src/custom_addons
+        run: |
+          mkdir -p logs/odoo-base
+          docker compose -f docker-compose.base.yml -p fence-base run --rm odoo odoo -i supply_chain_demo,sc_ai -d test_supplychain --stop-after-init
+          docker compose -f docker-compose.base.yml -p fence-base up -d odoo
+
+      - name: Wait for both instances
+        run: |
+          for port in 18069 28069; do
+            ok=0
+            for i in $(seq 1 60); do
+              if curl -fsS "http://localhost:$port/web/login" > /dev/null; then ok=1; break; fi
+              sleep 3
+            done
+            if [ "$ok" != "1" ]; then echo "port $port not ready"; exit 1; fi
+          done
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: python -m pip install --upgrade pip pyyaml
+
+      - name: Run fence on both targets (shared run_id)
+        working-directory: supply-chain-odoo-tests
+        run: |
+          RUN_ID="pr${{ github.event.pull_request.number }}_${{ github.run_number }}"
+          python -m fence.runner --target base --run-id "$RUN_ID"
+          python -m fence.runner --target head --run-id "$RUN_ID"
+          python -m fence.diff "fence/captures/base_${RUN_ID}.json" "fence/captures/head_${RUN_ID}.json" || true
+          python -m fence.verdict fence/captures/diff_report.json --intents fence/intents.yml
+
+      - name: Upload fence reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: behavior-fence-report
+          path: |
+            supply-chain-odoo-tests/fence/captures/diff_report.json
+            supply-chain-odoo-tests/fence/captures/verdict_report.json
 
   # L6 生产监控与治理：纯离线，无需 Odoo/docker，作为生产治理门禁。
   prod-monitor:
