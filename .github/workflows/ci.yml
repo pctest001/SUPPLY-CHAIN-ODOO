@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
   # L6 定时巡检：每日 01:30 UTC（北京 09:30）跑离线门禁（ai-eval + prod-monitor），
   # 作为与代码变更解耦的每日回归哨兵；重型 docker 任务（rpc/ui）定时触发时跳过。
   schedule:
@@ -72,7 +74,12 @@ jobs:
         run: docker compose up -d db
 
       - name: Init DB and install modules (main instance :8069)
-        run: docker compose run --rm odoo odoo -i supply_chain_demo,sc_ai -d supplychain --stop-after-init
+        run: docker compose run --rm odoo odoo -i supply_chain_demo,sc_ai -d supplychain --load-language zh_CN --stop-after-init
+
+      # UI 用例断言中文菜单（采购/库存），需对齐手工走查环境：装 zh_CN 后
+      # 还要把 admin 的界面语言切成中文（语言存于 res_partner.lang）
+      - name: Set admin UI language to zh_CN
+        run: docker compose exec -T db psql -U odoo -d supplychain -c "UPDATE res_partner SET lang='zh_CN' WHERE id IN (SELECT partner_id FROM res_users WHERE active);"
 
       - name: Start Odoo
         run: docker compose up -d odoo
@@ -96,9 +103,12 @@ jobs:
 
       - name: Run UI tests inside the container
         run: |
-          docker compose exec -T odoo bash -c "cd /mnt/ui_tests && python3 -m pytest -v -p no:cacheprovider --junitxml=report.xml"
+          set +e
+          docker compose exec -u root -T odoo bash -c "cd /mnt/ui_tests && python3 -m pytest -v -p no:cacheprovider --junitxml=report.xml"
+          RC=$?
           CID=$(docker compose ps -q odoo)
-          docker cp "$CID:/mnt/ui_tests/report.xml" supply-chain-odoo-tests/ui_tests/report.xml
+          docker cp "$CID:/mnt/ui_tests/report.xml" supply-chain-odoo-tests/ui_tests/report.xml || true
+          exit $RC
 
       - name: Upload UI report (if any)
         if: always()
@@ -117,6 +127,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Install deps
+        run: python -m pip install --upgrade pip pytest pyyaml
 
       - name: AI 评测门禁 (L4)
         working-directory: supply-chain-odoo-tests
@@ -200,7 +213,7 @@ jobs:
         env:
           FENCE_BASE_ADDONS: ${{ github.workspace }}/base-src/custom_addons
         run: |
-          mkdir -p logs/odoo-base
+          sudo mkdir -p logs/odoo-base
           docker compose -f docker-compose.base.yml -p fence-base run --rm odoo odoo -i supply_chain_demo,sc_ai -d test_supplychain --stop-after-init
           docker compose -f docker-compose.base.yml -p fence-base up -d odoo
 
@@ -251,6 +264,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Install deps
+        run: python -m pip install --upgrade pip pytest pyyaml
 
       - name: 生产监控门禁 (L6)
         working-directory: supply-chain-odoo-tests
