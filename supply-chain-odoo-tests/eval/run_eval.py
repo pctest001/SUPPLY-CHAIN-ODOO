@@ -38,7 +38,7 @@ def _load_cases(path: Path) -> list:
 
 def _run(mode: str, cases: list, judge):
     if mode == "live":
-        from engine import LiveAIClient
+        from .engine import LiveAIClient
         from src.odoo_client import OdooClient
         import os
         cli = OdooClient(
