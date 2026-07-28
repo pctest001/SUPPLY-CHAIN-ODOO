@@ -31,6 +31,7 @@ from .judge_prod import ProductionJudge
 from .metrics import compute_prod_metrics, compare_to_baseline
 from .alerting import evaluate_alerts, write_alert, DEFAULT_THRESHOLDS
 from .badcase import capture_bad_cases
+from defects.emit import emit_from_sessions
 from .versioning import analyze_versions
 from .notify import dispatch as notify_dispatch
 
@@ -54,7 +55,8 @@ def _load_baseline() -> dict:
             "refusal_accuracy": 100}
 
 
-def _summarize(metrics: dict, alerts: list, n_bad: int, vrep: dict) -> str:
+def _summarize(metrics: dict, alerts: list, n_bad: int, vrep: dict,
+               n_defects_created: int = 0, n_defects_updated: int = 0) -> str:
     lines = ["=== L6 生产监控与治理 (prodmon) ===",
              f"采样会话数: {metrics['total']}",
              f"  安全违规率 : {metrics['safety_violation_rate']}%",
@@ -71,6 +73,9 @@ def _summarize(metrics: dict, alerts: list, n_bad: int, vrep: dict) -> str:
         lines.append("[OK] 无告警")
     if n_bad:
         lines.append(f"[BAD CASE] 回流 {n_bad} 条问题会话 → bad_cases.jsonl")
+    if n_defects_created or n_defects_updated:
+        lines.append(f"[DEFECT] 缺陷闭环：新建 {n_defects_created} / 合并 {n_defects_updated} "
+                     f"→ defects/defects.jsonl")
     return "\n".join(lines)
 
 
@@ -78,7 +83,7 @@ def run(mode: str = "sim", fixtures_path: Path = DEFAULT_FIXTURES, fixtures: lis
         since_days: int = 7, sample_size: int = 0, strategy: str = "recent",
         fail_under: float = 80.0, thresholds: dict | None = None,
         notify: bool = False, webhook: str | None = None,
-        at_mobiles: list | None = None) -> int:
+        at_mobiles: list | None = None, emit_defects: bool = False) -> int:
     """执行一次生产监控，返回退出码（0=通过，1=门禁失败）。
 
     fixtures: 直接传入会话列表（测试/退化场景用）；为 None 时从 fixtures_path 读取。
@@ -108,6 +113,10 @@ def run(mode: str = "sim", fixtures_path: Path = DEFAULT_FIXTURES, fixtures: lis
     comparison = compare_to_baseline(metrics, baseline)
     alerts = evaluate_alerts(metrics, comparison, thresholds or DEFAULT_THRESHOLDS)
     n_bad = capture_bad_cases(sessions, results, DEFAULT_BADCASES)
+    # 缺陷闭环层：把问题会话沉淀为 defect（live 自动开启；sim 需显式 --emit-defects）
+    n_defects_created = n_defects_updated = 0
+    if emit_defects or mode == "live":
+        n_defects_created, n_defects_updated = emit_from_sessions(sessions, results)
     vrep = analyze_versions(sessions)
 
     # 门禁判定：致命告警 / 综合准确率不达标 / 相对 L4 基线退化 → 失败
@@ -124,7 +133,8 @@ def run(mode: str = "sim", fixtures_path: Path = DEFAULT_FIXTURES, fixtures: lis
         "alerts": [a.__dict__ for a in alerts],
         "bad_cases_captured": n_bad,
         "version_distribution": vrep,
-        "summary": _summarize(metrics, alerts, n_bad, vrep),
+        "summary": _summarize(metrics, alerts, n_bad, vrep,
+                              n_defects_created, n_defects_updated),
     }
     DEFAULT_REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     write_alert(report, alerts, DEFAULT_ALERT)
@@ -160,6 +170,9 @@ def main():
                     help="告警 webhook 地址（钉钉/企微/Slack 兼容）；缺省读 env PROD_ALERT_WEBHOOK")
     ap.add_argument("--at-mobiles", dest="at_mobiles", type=str, default=None,
                     help="逗号分隔手机号，告警时 @；缺省取 env PROD_ALERT_AT_MOBILES 或内置默认 18658159309")
+    ap.add_argument("--emit-defects", action="store_true",
+                    help="把问题会话沉淀为缺陷记录(defects/defects.jsonl)。live 模式默认开启；"
+                         "sim 需显式指定以免 CI 噪声")
     args = ap.parse_args()
     # 注意：run() 的形参顺序为 (mode, fixtures_path, fixtures, since_days, ...)，
     # 必须用关键字传参，避免 since_days(整数) 误入 fixtures 位导致 self._data 变 int。
@@ -167,7 +180,8 @@ def main():
                  since_days=args.since_days, sample_size=args.sample,
                  strategy=args.strategy, fail_under=args.fail_under,
                  notify=args.notify, webhook=args.webhook,
-                 at_mobiles=(args.at_mobiles.split(",") if args.at_mobiles else None)))
+                 at_mobiles=(args.at_mobiles.split(",") if args.at_mobiles else None),
+                 emit_defects=args.emit_defects))
 
 
 if __name__ == "__main__":

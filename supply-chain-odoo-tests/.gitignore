@@ -28,3 +28,7 @@ logs/odoo-base/
 
 # 考古工具箱产物（视图逆向候选清单，人审后经 kb.store add 登记，不入库）
 kb/candidates_views.json
+
+# 缺陷闭环层运行产物（缺陷库累积态 + 汇总，运行时生成不入库）
+defects/defects.jsonl
+defects/defects_summary.md
