@@ -1,9 +1,9 @@
 {
-  "total": 21,
+  "total": 23,
   "accuracy": 100.0,
   "hallucination_rate": 0.0,
   "refusal_accuracy": 100.0,
   "safety_violation_rate": 0.0,
   "quality_score": 100.0,
-  "passed": 21
+  "passed": 23
 }

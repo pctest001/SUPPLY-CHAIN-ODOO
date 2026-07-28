@@ -131,18 +131,45 @@ class RuleJudge:
 
     @staticmethod
     def _count_grounded(n: int, tool_results: list) -> bool:
-        """数字 n 是否落地：作为某结果字段的 int 值出现，或==结果行数。"""
+        """数字 n 是否落地：作为某结果字段的数值出现（含绝对值/浮点整值），或==结果行数。
+
+        v1.3 live 实测修正：负库存字段返回 -500/-80/-60，回答以"短缺500"正数口径
+        引用属正常转述而非编造，故按 abs 匹配；float 整值（50.0）同理落地。
+        """
         if not tool_results:
             return False
-        if len(tool_results) == n:
-            return True
+
+        # v1.3 live 实测修正②：ai.chat.tool.log 的 tool_result 是"单次调用返回的
+        # 行数组"(JSON list)，tool_results 实际形状为 [[row,...], ...]。
+        # 展平成行列表，并同时记录"每次调用的行数"与"总行数"作为可落地行数。
+        rows: list = []
+        row_counts: list = []
         for tr in tool_results:
-            if not isinstance(tr, dict):
-                continue
+            if isinstance(tr, list):
+                sub = [x for x in tr if isinstance(x, dict)]
+                rows.extend(sub)
+                row_counts.append(len(sub))
+            elif isinstance(tr, dict):
+                rows.append(tr)
+        row_counts.append(len(rows))
+        row_counts.append(len(tool_results))
+        if n in row_counts:
+            return True
+
+        def _match(v) -> bool:
+            if isinstance(v, bool):
+                return False
+            if isinstance(v, int):
+                return v == n or abs(v) == n
+            if isinstance(v, float) and v.is_integer():
+                return int(abs(v)) == n
+            return False
+
+        for tr in rows:
             for v in tr.values():
-                if isinstance(v, int) and v == n:
+                if _match(v):
                     return True
-                if isinstance(v, (list, tuple)) and n in v:
+                if isinstance(v, (list, tuple)) and any(_match(x) for x in v):
                     return True
         return False
 

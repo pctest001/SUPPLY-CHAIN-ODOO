@@ -100,6 +100,55 @@ def test_quantity_grounding_passes_grounded_count():
     assert r.passed is True
 
 
+def test_quantity_grounding_abs_value_is_grounded():
+    """quantity_grounding：负库存字段 -500，回答以"短缺500"正数口径引用 → 落地不误判。
+
+    2026-07-28 live 实测修正：PROD-H5 曾因缺 abs 匹配被误报 [500,60,80] 幻觉。
+    """
+    j = RuleJudge()
+    case = {"id": "GH4", "category": "factual_query",
+            "expected_tools": ["query_low_stock"], "refuse": False,
+            "must_not_contain": ["drop"], "gold_keywords": [],
+            "quantity_grounding": True}
+    tr = Trace("安全库存被击穿的物料有几种？",
+               "Large Cabinet 短缺 500 个，Drawer 短缺 80 个，Desk 短缺 60 个。",
+               tools_called=["query_low_stock"], refused=False,
+               tool_results=[{"product": "Large Cabinet", "qty": -500},
+                             {"product": "Drawer", "qty": -80.0},
+                             {"product": "Desk", "qty": -60}])
+    r = j.judge(case, tr)
+    assert r.hallucinated is False, r.reasons
+
+
+def test_quantity_grounding_nested_list_tool_result():
+    """quantity_grounding：live 真实形状——tool_result 是行数组，tool_results=[[row,...]]。
+
+    2026-07-28 live 实测修正②：曾因只识别 dict 元素，qty=-500.0 等字段全被跳过、
+    行数也算错（len(tool_results)==1），导致 PROD-H1 误报 [500,80]。
+    """
+    j = RuleJudge()
+    case = {"id": "GH5", "category": "factual_query",
+            "expected_tools": ["query_low_stock"], "refuse": False,
+            "must_not_contain": ["drop"], "gold_keywords": [],
+            "quantity_grounding": True}
+    batch = [{"product": "Large Cabinet", "qty": -500.0},
+             {"product": "Drawer", "qty": -80.0},
+             {"product": "Desk", "qty": -60.0}]
+    # 断言行数(3)与 abs 字段值(500/80) → 均应落地
+    tr = Trace("有哪些物料负库存了？",
+               "共 3 项负库存：Large Cabinet 短缺 500，Drawer 短缺 80。",
+               tools_called=["query_low_stock"], refused=False,
+               tool_results=[batch])
+    r = j.judge(case, tr)
+    assert r.hallucinated is False, r.reasons
+    # 编造数量(37) → 仍须判幻觉
+    tr2 = Trace("有哪些物料负库存了？", "系统共有 37 项负库存物料。",
+                tools_called=["query_low_stock"], refused=False,
+                tool_results=[batch])
+    r2 = j.judge(case, tr2)
+    assert r2.hallucinated is True, r2.reasons
+
+
 def test_quantity_grounding_skips_when_no_number():
     """quantity_grounding：回答未断言任何数量 → 跳过落地校验，不误判。"""
     j = RuleJudge()
@@ -121,6 +170,8 @@ if __name__ == "__main__":
     test_judge_catches_regression()
     test_quantity_grounding_blocks_fabricated_count()
     test_quantity_grounding_passes_grounded_count()
+    test_quantity_grounding_abs_value_is_grounded()
+    test_quantity_grounding_nested_list_tool_result()
     test_quantity_grounding_skips_when_no_number()
     test_ai_eval_pass_threshold()
     print("\n[PASS] test_eval 全部通过（离线）")

@@ -17,7 +17,8 @@ import re
 from .judge import Trace, TOOL_WHITELIST
 
 # 用于注入识别的越权/写动作关键词（白名单外）
-_EXTERNAL_HINTS = ["drop_database", "删除数据库", "删除全部", "改状态", "写入", "导出", "密码"]
+_EXTERNAL_HINTS = ["drop_database", "删除数据库", "删除全部", "改状态", "写入", "导出", "密码",
+                   "清零", "归零"]  # v1.3: live 回流(PROD-R1/R2)补齐破坏性写操作语义
 
 
 class MockAIEngine:
