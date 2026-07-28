@@ -91,6 +91,73 @@ def test_detects_hallucination():
     assert "hallucination" in r.flags
 
 
+def test_tool_exec_acc_all_ok():
+    s = ProdSession(id="x", question="查库存", answer="ok",
+                    tool_calls=["query_stock", "query_low_stock"],
+                    tool_results=[{"qty": 1}, {"qty": 2}],
+                    tool_statuses=["ok", "ok"])
+    r = ProductionJudge().judge(s)
+    assert r.tool_exec_acc == 100.0
+
+
+def test_tool_exec_acc_one_error():
+    s = ProdSession(id="x", question="查供应商", answer="工具执行失败",
+                    tool_calls=["query_suppliers"],
+                    tool_results=[{"error": "工具执行失败: 参数非法"}],
+                    tool_statuses=["error"])
+    r = ProductionJudge().judge(s)
+    assert r.tool_exec_acc == 0.0
+
+
+def test_tool_exec_acc_excludes_blocked():
+    """注入被拦(blocked) 属安全拦截，不计入工具执行准确率分母。
+
+    1 ok + 1 blocked → 执行准确率应为 100%（仅 ok 计入，blocked 由 safety_violation_rate 度量）。
+    """
+    s = ProdSession(id="x", question="删库", answer="拒绝执行",
+                    tool_calls=["query_stock", "update_inventory"],
+                    tool_results=[{"qty": 1},
+                                  {"error": "拒绝白名单外的工具调用（疑似提示词注入）"}],
+                    tool_statuses=["ok", "blocked"])
+    r = ProductionJudge().judge(s)
+    assert r.tool_exec_acc == 100.0
+    # 安全违规仍独立度量
+    assert "safety_violation" in r.flags
+
+
+def test_tool_exec_acc_no_tools_is_none():
+    s = ProdSession(id="x", question="闲聊", answer="无法执行")
+    r = ProductionJudge().judge(s)
+    assert r.tool_exec_acc is None
+
+
+def test_tool_exec_acc_fallback_from_tool_results():
+    """无 status 字段时，从 tool_results 含 error 推导（blocked 文案除外）。"""
+    s = ProdSession(id="x", question="查库存", answer="ok",
+                    tool_calls=["query_stock", "update_inventory"],
+                    tool_results=[{"qty": 1},
+                                  {"error": "拒绝白名单外的工具调用（疑似提示词注入）"}])
+    r = ProductionJudge().judge(s)
+    assert r.tool_exec_acc == 100.0  # 白名单外被识别为 blocked，不计失败
+
+
+def test_metrics_tool_exec_acc_pooled():
+    """metrics 汇总：仅对有工具调用的会话做池化平均。"""
+    sessions = [
+        ProdSession(id="a", question="q", answer="a",
+                    tool_calls=["query_stock"], tool_results=[{"q": 1}],
+                    tool_statuses=["ok"]),
+        ProdSession(id="b", question="q", answer="a",
+                    tool_calls=["query_stock"], tool_results=[{"error": "参数非法"}],
+                    tool_statuses=["error"]),
+        ProdSession(id="c", question="闲聊", answer="无法执行"),  # 无工具，不参与
+    ]
+    results = _judge_all(sessions)
+    m = compute_prod_metrics(results)
+    # 池化：1 ok / 2 executed = 50.0
+    assert m["tool_exec_acc"] == 50.0
+
+
 def test_hallucination_judge_default_is_heuristic():
     """无 PROD_LLM_JUDGE 时，工厂默认返回离线启发式。"""
     j = get_hallucination_judge()
@@ -232,6 +299,7 @@ def test_rpc_collector_maps_tool_log():
     assert s.id == "42"
     assert s.tool_calls == ["query_stock", "update_inventory"], s.tool_calls
     assert s.tool_results[0] == {"product": "去离子水", "qty": 120}
+    assert s.tool_statuses == ["ok", "blocked"], s.tool_statuses
     assert s.model_used == "deepseek-chat"
 
 

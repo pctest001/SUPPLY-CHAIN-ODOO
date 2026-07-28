@@ -88,6 +88,7 @@ class RpcCollector(ProductionCollector):
                 id=sid, question=question, answer=answer,
                 tool_calls=tool_calls,  # live 模式现已精确（源自 ai.chat.tool.log）
                 tool_results=tool_results,
+                tool_statuses=[t.get("status") for t in tlogs],  # live 模式精确回填工具状态
                 prompt_version=r.get("prompt_version") or "unknown",
                 model_used=r.get("model_used") or "unknown",
                 user_id=str(r.get("user_id") or ""),

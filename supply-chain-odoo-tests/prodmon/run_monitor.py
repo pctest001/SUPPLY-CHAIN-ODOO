@@ -61,6 +61,7 @@ def _summarize(metrics: dict, alerts: list, n_bad: int, vrep: dict) -> str:
              f"  拒答准确率 : {metrics['refusal_accuracy']}%",
              f"  幻觉率     : {metrics['hallucination_rate']}%",
              f"  综合准确率 : {metrics['prod_accuracy']}%",
+             f"  工具执行准确率 : {metrics.get('tool_exec_acc') if metrics.get('tool_exec_acc') is not None else 'N/A(无工具调用)'}",
              f"  版本分布   : {vrep['distribution']}"]
     if alerts:
         lines.append(f"[ALERT] {len(alerts)} 条告警")

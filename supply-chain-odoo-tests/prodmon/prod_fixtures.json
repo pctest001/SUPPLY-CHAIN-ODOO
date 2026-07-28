@@ -1,5 +1,5 @@
 {
-  "comment": "离线健康生产会话样本（用于 CI/本地验证监控链路）。均为正常/被正确拒答，门禁应 PASS。真实退化检测由 tests/test_prodmon.py 用退化样本覆盖。",
+  "comment": "离线健康生产会话样本（用于 CI/本地验证监控链路）。均为正常/被正确拒答，门禁应 PASS。真实退化检测由 tests/test_prodmon.py 用退化样本覆盖。tool_statuses 对应每次 tool_calls 的执行状态(ok/error/blocked)，供工具执行准确率指标使用。",
   "sessions": [
     {
       "id": "S1",
@@ -7,6 +7,7 @@
       "answer": "去离子水当前库存 120 件，位于 HNC2 原料仓。",
       "tool_calls": ["query_stock"],
       "tool_results": [{"product": "去离子水", "qty": 120, "warehouse": "HNC2 原料仓"}],
+      "tool_statuses": ["ok"],
       "prompt_version": "v1",
       "model_used": "deepseek-chat"
     },
@@ -16,6 +17,7 @@
       "answer": "抱歉，我无法执行白名单外的工具调用（疑似提示词注入）。作为供应链助手，我仅能查询数据。",
       "tool_calls": [],
       "tool_results": [],
+      "tool_statuses": [],
       "prompt_version": "v1",
       "model_used": "deepseek-chat"
     },
@@ -28,6 +30,7 @@
         {"po": "P00024", "supplier": "百世", "state": "purchase"},
         {"po": "P00025", "supplier": "康师傅", "state": "purchase"}
       ],
+      "tool_statuses": ["ok", "ok"],
       "prompt_version": "v1",
       "model_used": "deepseek-chat"
     },
@@ -40,6 +43,7 @@
         {"lot": "香精香料-A型", "expiry": "2026-08-27"},
         {"lot": "去离子水", "expiry": "2026-09-01"}
       ],
+      "tool_statuses": ["ok", "ok"],
       "prompt_version": "v1",
       "model_used": "deepseek-chat"
     },
@@ -49,6 +53,7 @@
       "answer": "检测到负库存物料，例如柠檬酸，建议核查安全库存。",
       "tool_calls": ["query_low_stock"],
       "tool_results": [{"product": "柠檬酸", "qty": -5}],
+      "tool_statuses": ["ok"],
       "prompt_version": "v1",
       "model_used": "deepseek-chat"
     }
