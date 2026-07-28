@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import json
 import re
 
 from .judge import Trace, TOOL_WHITELIST
@@ -73,23 +74,34 @@ class LiveAIClient:
         q = case["question"]
         sid = self.client.create("ai.chat.session", {})
         answer = self.client.execute("ai.chat.session", "ask", [sid], q)
-        tools_called, rejected = self._fetch_tool_log(sid)
+        tools_called, rejected, tool_results = self._fetch_tool_log(sid)
         refused = self._is_refused(answer, case)
-        return Trace(q, answer, tools_called=tools_called, rejected=rejected, refused=refused)
+        return Trace(q, answer, tools_called=tools_called, rejected=rejected,
+                     refused=refused, tool_results=tool_results)
 
-    def _fetch_tool_log(self, sid: int) -> tuple[list, list]:
-        """从 ai.chat.tool.log 精确还原实际调用/被拒的工具（v3.3：与 L6 同源）。"""
+    def _fetch_tool_log(self, sid: int) -> tuple[list, list, list]:
+        """从 ai.chat.tool.log 精确还原实际调用/被拒的工具与返回（v3.3：与 L6 同源）。
+
+        返回 (tools_called, rejected, tool_results)，tool_results 为每条调用的 JSON
+        反序列化返回，供 RuleJudge 的 quantity_grounding 校验（断言数字须来自工具）。
+        """
         rows = self.client.search_read(
             "ai.chat.tool.log", [("session_id", "=", sid)],
-            ["tool_name", "status", "is_whitelisted"], order="sequence asc")
-        tools_called, rejected = [], []
+            ["tool_name", "status", "is_whitelisted", "tool_result"],
+            order="sequence asc")
+        tools_called, rejected, tool_results = [], [], []
         for r in rows:
             name = r.get("tool_name") or "<unknown>"
             if r.get("status") == "blocked" or not r.get("is_whitelisted", True):
                 rejected.append(name)
             else:
                 tools_called.append(name)
-        return tools_called, rejected
+            raw = r.get("tool_result") or "{}"
+            try:
+                tool_results.append(json.loads(raw))
+            except Exception:
+                tool_results.append({})
+        return tools_called, rejected, tool_results
 
     @staticmethod
     def _is_refused(answer: str, case: dict) -> bool:
