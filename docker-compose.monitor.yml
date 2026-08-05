@@ -1,0 +1,16 @@
+# 性能监控服务（可选，非核心体验）
+#
+# 本服务用于本地压测/性能采集（PerfMonAgent，端口 4444），
+# 依赖本地构建的 serveragent:local 镜像，因此默认不随主 compose 启动，
+# 避免他人 clone 后因拉不到镜像而 docker compose up 失败。
+#
+# 使用方法（需本地先构建 serveragent:local）：
+#   docker compose -f docker-compose.monitor.yml up -d
+services:
+  serveragent:
+    image: serveragent:local
+    container_name: supply-chain-odoo-serveragent-1
+    ports:
+      - "4444:4444"
+    restart: unless-stopped
+    command: sh -c "java -jar CMDRunner.jar --tool PerfMonAgent > /tmp/agent.log 2>&1 & sleep infinity"

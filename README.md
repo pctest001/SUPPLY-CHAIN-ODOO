@@ -33,20 +33,35 @@ ADMIN_LOGIN=admin@example.com ADMIN_PASSWORD='YourPass123' ./init.sh
 
 ```
 supply-chain-odoo/
-├── docker-compose.yml          # Odoo 18 + Postgres 15
+├── docker-compose.yml          # Odoo 18 + Postgres 15（核心，开箱即跑）
+├── docker-compose.monitor.yml  # 可选：性能监控服务(PerfMonAgent)，需本地 serveragent:local 镜像
+├── docker-compose.sonar.yml    # SonarQube CE 静态代码质量扫描（9090→9000，H2 内置库，不进 CI）
+├── sonar-project.properties    # 扫描配置：仅扫 custom_addons，排除 .venv/.env/测试目录
 ├── init.sh                     # 可复现初始化（建库+装模块+设 admin）
-├── scripts/reset_admin.py      # 可重复重置 admin 凭据（不削弱安全）
+├── LICENSE / CONTRIBUTING.md   # MIT 许可证与协作约定
 ├── custom_addons/
-│   ├── supply_chain_demo/      # 供应链核心模块
-│   └── sc_ai/                  # AI 智能层模块
-└── README.md
+│   ├── supply_chain_demo/      # 供应链核心模块（MVP 主数据/采购/多仓库存/批次效期）
+│   ├── sc_ai/                  # AI 智能层模块（F6 只读白名单 + 全链路降级）
+│   └── sc_log_trace/           # 日志追踪模块（审计/留痕，随 init.sh 一并安装）
+├── scripts/
+│   ├── inventory_dashboard.py  # F1 库存看板（标准库 http.server，无第三方依赖）
+│   └── reset_admin.py          # 可重复重置 admin 凭据（不削弱安全）
+├── supply-chain-odoo-tests/    # 自动化测试工程（RPC 黑盒 + UI 自动化 + CI）
+├── odoo-mcp-server/           # 缺口1：MCP Server（FastMCP 暴露 sc_ai 6 只读工具，内部 XML-RPC 黑盒调 Odoo，绝不 import odoo）
+├── supply-chain-agent/        # 缺口1：供应链 Agent（LangGraph ReAct 经 MCP 协议连 Server，全链路降级复用 sc_ai 哲学）
+├── test-platform/            # 缺口3：测试平台 Web 可视化（FastAPI 后端聚合 + ECharts 前端仪表盘，只聚合不造假）
+├── README.md
 ├── 作品说明.md                # 面试作品集叙事（定位/架构/亮点/STAR）
-├── 演示走查脚本.md            # 现场 UI 走查 + 一键自检清单
-└── scripts/
-    └── h1_e2e.py              # H1 端到端联调（主链路+AI，35/35 PASS，事务内回滚）
+└── 演示走查脚本.md            # 现场 UI 走查 + 一键自检清单
 ```
 
+> ✅ **无需 AI Key 也能完整运行**：未配置 `SUPPLY_AI_API_KEY` 时，核心供应链功能（采购 / 库存 / 批次效期 / 审批 / 拦截）100% 可用，AI 助手会自动降级（提示「AI 暂不可用」），不影响任何主流程。AI 可选启用，见下文「配置 AI」。
+
 ## 自定义模块说明
+
+### sc_log_trace（日志追踪）
+- 随 `init.sh` 一并安装（`docker compose run odoo -i supply_chain_demo,sc_ai,sc_log_trace`）
+- 提供操作审计/留痕能力，被 `sc_ai` 等模块用于结构化记录关键动作，便于排查与追溯
 
 ### supply_chain_demo（核心 MVP）
 - 依赖 `product / purchase / stock / product_expiry`（效期追溯）
@@ -113,3 +128,8 @@ docker compose ps
 - **L4 AI 评测 + 有效性度量**：`eval/` 包对 AI 助手做金标准评测（`eval_set.json` v1.3 共 23 用例，含 L6 生产回流：PROD-61/R1/R2 漏拒种子 + PROD-H1~H6 幻觉种子(quantity_grounding 数量落地校验，live 实测三轮迭代 91.3 分)）与可插拔裁判（RuleJudge / LLM-as-Judge），量化准确率 / 幻觉率 / 拒答率 / 安全违规率，并落地 §8 有效性度量（北极星逃逸率、拦截率、金标准 kappa 校准）。纯标准库、离线可跑：`python -m eval.run_eval --mode sim --fail-under 80` 与 `python -m eval.effectiveness`。详见 `supply-chain-odoo-tests/测试工程技术方案.md` §4.7 与 `supply-chain-odoo-tests/质量体系架构.md`。
 - **L6 生产监控与治理**：`prodmon/` 包在线采样生产 `ai.chat.session`，经 `ProductionJudge` 跑安全违规 / 拒答异常 / 幻觉信号 / **工具执行准确率 tool_exec_acc**（v3.4 新增，基于 `ai.chat.tool.log` 的 status 判定 ok/error/blocked，blocked 单列安全指标不计入失败）信号（无需金标准），对比 L4 回归基线 `eval_baseline.json` 触发告警；`sc_ai` 会话落 `prompt_version` / `model_used` 版本留痕，bad case 自动回流 L4 回归。live 模式接真实 SUT：`sc_ai` 新增 `ai.chat.tool.log` 持久化每次工具调用，`RpcCollector` 精确回填 tool_calls/tool_results/tool_statuses 精测工具准确率与安全；告警经 `prodmon/notify.py` 推送钉钉/企微/Slack webhook（`--notify` / `PROD_ALERT_WEBHOOK`，无配置降级 dry-run 审计），钉钉告警默认 @负责人手机号（`--at-mobiles` / `PROD_ALERT_AT_MOBILES` 可改，传 `[]` 关闭），形成"监控 → bad case → L4 回归 → prompt 迭代"闭环——且已用真实 LLM 完整演练一轮：L6 抓到的真实注入漏拒 case（PROD-61）回流评测集，prompt v1→v2 后 live 评测 15/15 满分、攻击重放被正确拒绝（详见测试方案 §4.8.3）。幻觉哨兵可插拔：默认启发式，`PROD_LLM_JUDGE=1` 时升级 LLM-as-Judge 复用 DeepSeek（见 §4.8.5）；报告统一呈现见 §4.9（`python -m reports.build` 生成自包含 HTML 仪表盘 + Markdown 周报）。纯标准库、离线可跑：`python -m prodmon.run_monitor --mode sim --fail-under 80`（另有 `tests/test_prodmon.py`）。定时巡检双通道：CI 每日 cron 跑离线门禁（ai-eval + prod-monitor，重型任务定时跳过）+ 本机定时任务每日对真实 SUT 跑 live 巡检。详见 `supply-chain-odoo-tests/测试工程技术方案.md` §4.8 与 `supply-chain-odoo-tests/质量体系架构.md`；当前 prompt 已迭代至 v3——强化第 1 条安全规则消除 PROD-R2 复合指令"先查后拒"泄露库存回归（live 重放验证零工具调用、安全违规率 0%），数量类编造（AI 报 50/55/52/51/51 ≠ 工具真实 53 行）接受为已知 SUT 缺陷基线（L6 幻觉率 12.5% 告警即生产信号，不再为幻觉修 prompt，护栏已拦截）。详见 §4.8.6。
 - **缺陷闭环层（Defect Closure）**：`defects/` 包把"发现问题之后"的链路补上——监控/CI 抓到的缺陷统一沉淀为 defect（按 signature 去重），走 Open→Triage→Fixing→Verifying→Closed 生命周期，关闭须挂验证证据；本地 `defects/defects.jsonl` 持久化，外部工单（GitHub/TAPD）作为可插拔 sink（连接器就绪即接）；`run_monitor --emit-defects` 自动把生产 bad case 建单，`python -m defects.cli emit-ci` 供 CI 门禁命中真实缺陷时建单（如 mutation 抓到"查过期批次用了不存在字段"）。详见 §4.10。
+- **AI Agent 协议层 + 供应链 Agent（缺口 1）**：`odoo-mcp-server/`（FastMCP 把 `sc_ai` 6 个只读工具暴露为标准 MCP 协议，内部 XML-RPC 黑盒调 Odoo @18069，与测试工程层同原则「独立进程、绝不 import odoo」）+ `supply-chain-agent/`（LangGraph ReAct Agent 经 MCP 协议连 Server 做供应链问答，无 API Key 走规则引擎降级，prompt 安全规则对齐 sc_ai v3）。黑盒 Agent 测试 `tests/test_agent.py` 5 自包含用例（工具单元 / MCP 暴露 / Agent 降级 / Agent 安全拒绝 / e2e 跳过需真实环境），不依赖真实 LLM 与 Odoo：`cd supply-chain-odoo-tests && pytest tests/test_agent.py --noconftest`。对应 JD「AI Agent 评测保障 + MCP 协议」；Agent 轨迹评测（缺口 2，L4-A）已落地，复用 L4 quality_score 公式扩展。详见 `supply-chain-odoo-tests/质量体系架构.md` §5。
+- **AI Agent 轨迹评测（L4-A，缺口 2）**：把 L4 单轮评测升级到**多步 Agent 轨迹**——`eval/agent_eval.py` 的 `AgentJudge` 复用 L4 口径（同一 6 工具白名单、`quality_score = 100*任务完成率*(1-幻觉)*(1-安全违规)` 乘法公式、`RuleJudge._ungrounded_counts` 跨步数量落地），并新增 Agent 独有维度：任务完成率（北极星）、工具编排正确性、循环检测（同调用≥3次）、轨迹级注入检测。`agent_eval_set.json` 12 用例（6 工具 + 多步/多工具编排 + 3 类拒答）；`run_agent_eval.py` 支持 sim/live + fail-under 门禁 + 基线对比；`tests/test_agent_eval.py` 8 用例全绿（门禁 + judge 抓 5 类回归：工具循环 / 错误工具 / 任务未完成 / 轨迹中注入 / 跨步幻觉）。live 物理连接缺口 1：`agent.py` 的 `run_agent()` 返回 LangGraph 消息，`trace_from_langgraph_messages` 还原真实轨迹喂给 `AgentJudge`。离线可跑：`cd supply-chain-odoo-tests && pytest tests/test_agent_eval.py --noconftest` 或 `python -m eval.run_agent_eval --mode sim --fail-under 80`。对应 JD「AI Agent 评测保障经验者优先」这一硬通货。详见 `质量体系架构.md` §5。
+- **测试平台 Web 可视化（缺口 3）**：`test-platform/`（FastAPI 后端聚合 + ECharts 前端仪表盘）把上述真实质量产物可视化——L4 / L4-A 质量总分仪表、维度雷达（准确性/拒答/抗幻觉/安全性，L4 vs L4-A）、Mutation 拦截仪表 + 拦截列表、用例通过分布、覆盖率面板。**原则：只聚合、不重测、不造假**，缺数据如实标注（coverage 未采集即给出采集命令，绝不编造假百分比，呼应 Mutation 反假绿）。API：`/api/summary`、`/api/eval`、`/api/agent-eval`、`/api/mutation`、`/api/coverage`；运行：`cd test-platform/backend && uvicorn app:app --port 8011` 后开 `http://127.0.0.1:8011`。对应 JD 加分项「测试平台开发」。详见 `test-platform/README.md` 与 `质量体系架构.md` §5.5。
+- **AI for Testing（缺口 4）**：`ai4t/` 把 JD 加分项第 1 条（权重最高）落地为两块，且**不重复已有能力**——① 用例生成 `casegen` 在 `src/generator/metagen.py`（元数据驱动结构型断言生成器）之上加「业务语义理解层」：LLM 读字段元数据(`help`/`selection`/`relation`)推断 metagen 覆盖不到的业务场景，产出**待人工审核** spec（`reviewed=False` 不进 CI，守住 P0#3 人审 + 反假绿）；无 Key 走规则引擎（只产必填缺失/非法 selection 高置信拒绝类，不编造业务约束）。② 测试失败智能诊断 `diagnosis`：metagen 完全没有的能力，LLM 分析 pytest 失败→分类(env/data/code/sut/flaky)/根因/修复建议→落 `healer_audit.jsonl`（复用 `src/healer.audit.AuditLog`，`layer="diagnosis"`），**绝不自动改 SUT 业务代码让测试过**（守 heal.py 红线）。统一 `llm_client.py`（OpenAI 兼容，标准库 urllib 实现，无 Key 优雅降级）。离线可跑：`cd supply-chain-odoo-tests && pytest tests/test_ai4t.py --noconftest` → 7 passed。详见 `质量体系架构.md` §5.6。
+- **静态代码质量扫描（SonarQube CE，L0 静态层，开发期补充）**：本机 Docker 起 SonarQube CE（9090→9000）对 `custom_addons` 做静态扫描（漏洞/安全热点/坏味道/复杂度/重复）。首扫 18 issue（含 `python:S905`/`S1192` Odoo 误报 + `stock_receipt_lot.py` 认知复杂度 71 真信号）；经**自定义 Quality Profile「custom-python」关 S1192/S905 + 重构 `button_validate` 拆分守卫子方法**后，降噪 + 修复结果：**4 个未解决 issue（均 MINOR：S117×3 + S3863×1）、0 漏洞、0 安全热点、0 bug**。Profile 备份见 `custom-python-profile.xml`（183 规则）。**边界**：CE 无 PR 门禁（已接受），属开发期手动补充检查，**不进 CI 门禁、不替代 qasys 运行时/AI 层（L4/L6）**，仅补「代码静态质量」维度。运行：`docker compose -f docker-compose.sonar.yml up -d` 起服务，`SONAR_TOKEN=<token> ./scripts/sonar-scan.sh` 重扫；看板 http://localhost:9090 。详见 `supply-chain-odoo-tests/测试工程技术方案.md` §4.11 与 `质量体系架构.md` §3。

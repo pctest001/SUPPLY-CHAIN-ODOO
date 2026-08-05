@@ -331,6 +331,8 @@ class AiChatSession(models.Model):
         if not key:
             raise UserError(_('未配置 AI API Key（请设置环境变量 %s）') % (cfg.api_key_env or 'SUPPLY_AI_API_KEY'))
         headers = {'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'}
+        # 安全下限：避免 cfg.timeout 被误配为 0/负，导致 requests 无限等待、挂死 Odoo worker
+        timeout = max(int(cfg.timeout or 0), 8)
         payload = {
             'model': cfg.model,
             'messages': messages,
@@ -338,9 +340,12 @@ class AiChatSession(models.Model):
             'tool_choice': 'auto',
             'max_tokens': cfg.max_tokens,
         }
-        r = requests.post(cfg._endpoint(), json=payload, headers=headers, timeout=cfg.timeout)
+        r = requests.post(cfg._endpoint(), json=payload, headers=headers, timeout=timeout)
         r.raise_for_status()
-        msg = r.json()['choices'][0]['message']
+        try:
+            msg = r.json()['choices'][0]['message']
+        except (ValueError, KeyError) as e:
+            raise RuntimeError('AI 返回格式异常: %s' % e)
         if msg.get('tool_calls'):
             messages.append({'role': 'assistant', 'content': msg.get('content', ''),
                              'tool_calls': msg['tool_calls']})
@@ -369,7 +374,7 @@ class AiChatSession(models.Model):
                 messages.append({'role': 'tool', 'tool_call_id': tc['id'],
                                  'content': json.dumps(result, ensure_ascii=False, default=str)})
             payload['messages'] = messages
-            r2 = requests.post(cfg._endpoint(), json=payload, headers=headers, timeout=cfg.timeout)
+            r2 = requests.post(cfg._endpoint(), json=payload, headers=headers, timeout=timeout)
             r2.raise_for_status()
             return r2.json()['choices'][0]['message'].get('content', '')
         return msg.get('content', '')
